@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CMS Issue Ledger</title>
+<style>
+/* ============================================================
+   THEME / TOKENS
+   ============================================================ */
+:root{
+  --bg:#0d1117;
+  --bg2:#11161d;
+  --panel:#151b23;
+  --panel2:#1b222c;
+  --border:#252d38;
+  --border2:#323c4a;
+  --fg:#d7dee8;
+  --fg-dim:#8b97a7;
+  --fg-faint:#5f6b7a;
+  --accent:#4a9eff;
+  --accent-dim:#1f3a5c;
+  --good:#3fb950;
+  --warn:#d9a429;
+  --bad:#f0616d;
+  --money:#5fd39b;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --row-h:26px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font:12.5px/1.45 var(--mono);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+button,select,input{font:inherit;color:inherit}
+button{
+  background:var(--panel2);border:1px solid var(--border2);color:var(--fg);
+  padding:4px 9px;border-radius:3px;cursor:pointer;
+}
+button:hover{background:#243040;border-color:#42505f}
+button:active{transform:translateY(1px)}
+button.primary{background:var(--accent-dim);border-color:#2f5d8f;color:#cfe4ff}
+button.primary:hover{background:#264b73}
+button.danger{border-color:#5c2830;color:#ffb8bd;background:#2a1618}
+button.danger:hover{background:#3a1c20}
+button.sm{padding:2px 6px;font-size:11px}
+input[type=text],input[type=number],input[type=date],select{
+  background:#0b0f14;border:1px solid var(--border2);border-radius:3px;padding:3px 6px;
+}
+input:focus,select:focus{outline:1px solid var(--accent);outline-offset:-1px}
+code{background:#0b0f14;padding:1px 4px;border-radius:2px;color:#c6d3e2}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.wrap{max-width:1680px;margin:0 auto;padding:0 14px 60px}
+header.top{
+  border-bottom:1px solid var(--border);background:var(--bg2);
+  position:sticky;top:0;z-index:50;
+}
+.top-in{max-width:1680px;margin:0 auto;padding:8px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.brand{font-weight:700;letter-spacing:.04em;font-size:13px;color:#eef3f9}
+.brand span{color:var(--fg-faint);font-weight:400;margin-left:8px;letter-spacing:0}
+.top-right{margin-left:auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.rpm-chip{
+  border:1px solid #3d4a2a;background:#1c2116;color:#d7e4b8;
+  padding:3px 8px;border-radius:3px;font-size:11.5px;
+}
+.rpm-chip b{color:#eaf5c9}
+.storage{font-size:11px;color:var(--fg-dim);display:flex;gap:6px;align-items:center}
+.bar{width:90px;height:6px;background:#0b0f14;border:1px solid var(--border2);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);transition:width .2s}
+.bar.warn i{background:var(--warn)}
+.bar.bad i{background:var(--bad)}
+
+nav.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:0 0 14px;flex-wrap:wrap}
+nav.tabs button{
+  background:transparent;border:1px solid transparent;border-bottom:none;
+  border-radius:4px 4px 0 0;padding:7px 14px;color:var(--fg-dim);margin-bottom:-1px;
+}
+nav.tabs button:hover{color:var(--fg);background:var(--panel)}
+nav.tabs button.on{
+  color:#eaf1fa;background:var(--panel);border-color:var(--border);
+  border-bottom:1px solid var(--panel);
+}
+.view{display:none}
+.view.on{display:block}
+
+/* ============================================================
+   PANELS / CARDS
+   ============================================================ */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:5px;margin:0 0 14px}
+.panel>h2{
+  margin:0;padding:8px 11px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+  color:#b9c5d4;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;
+}
+.panel>h2 .sub{text-transform:none;letter-spacing:0;color:var(--fg-faint);font-weight:400;font-size:11.5px}
+.panel>h2 .spacer{margin-left:auto}
+.panel .body{padding:11px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:9px;margin:14px 0}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:9px 11px}
+.card .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-faint)}
+.card .v{font-size:21px;font-weight:700;margin:3px 0 1px;color:#f0f5fb;letter-spacing:-.01em}
+.card .v.money{color:var(--money)}
+.card .s{font-size:10.5px;color:var(--fg-dim)}
+.note{color:var(--fg-dim);font-size:11px;margin:6px 0 0;line-height:1.5}
+.note.warn{color:#e8c98a}
+.hr{height:1px;background:var(--border);margin:12px 0}
+
+/* ============================================================
+   IMPORT / DROP ZONE
+   ============================================================ */
+#drop{
+  border:1.5px dashed var(--border2);border-radius:5px;padding:16px;text-align:center;
+  color:var(--fg-dim);background:#0f141a;transition:.15s;
+}
+#drop.hot{border-color:var(--accent);background:#101b28;color:#cfe4ff}
+#drop b{color:var(--fg)}
+.stage-tbl input[type=date]{width:130px}
+.badge{
+  display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;
+  border:1px solid var(--border2);background:var(--panel2);color:var(--fg-dim);
+}
+.badge.dup{background:#2a2113;border-color:#5c4a1e;color:#f0d79a}
+.badge.ok{background:#12251a;border-color:#245c33;color:#a4e4b8}
+.badge.err{background:#2a1618;border-color:#5c2830;color:#ffb8bd}
+.badge.ov{background:#1a2333;border-color:#31527d;color:#a8c9f5}
+.badge.dp{background:#241a2e;border-color:#4d3164;color:#d6b5f0}
+
+/* ============================================================
+   TABLES
+   ============================================================ */
+.tbl-head{display:flex;gap:8px;align-items:center;padding:7px 11px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tbl-head input[type=text]{width:210px}
+.tbl-head .spacer{margin-left:auto}
+.tbl-head .count{font-size:11px;color:var(--fg-faint)}
+.scroll{overflow-x:auto;max-height:620px;overflow-y:auto}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:11.8px}
+thead th{
+  position:sticky;top:0;z-index:2;background:#1a212b;text-align:left;
+  padding:5px 8px;border-bottom:1px solid var(--border2);white-space:nowrap;
+  color:#aeb9c8;font-weight:600;cursor:pointer;user-select:none;
+}
+thead th:hover{background:#212b37;color:#e6eef8}
+thead th.na{cursor:default}
+thead th.na:hover{background:#1a212b;color:#aeb9c8}
+thead th .ar{color:var(--accent);font-size:9px;margin-left:3px}
+tbody td{padding:3px 8px;border-bottom:1px solid #1c232c;vertical-align:top;white-space:nowrap}
+tbody tr:hover>td{background:#161d26}
+tbody tr.exp-row:hover>td{background:transparent}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.money{color:var(--money);text-align:right;font-variant-numeric:tabular-nums}
+td.dim{color:var(--fg-dim)}
+td.wide{white-space:normal;max-width:330px;word-break:break-word}
+td.id{font-size:11px;color:#a9b6c6}
+.tg{
+  cursor:pointer;color:var(--accent);display:inline-block;width:12px;text-align:center;
+  user-select:none;
+}
+.hot3{color:#ffce6b;font-weight:700}
+.hot2{color:#e8dca8}
+.sub-tbl{background:#0f141a;border:1px solid var(--border);border-radius:4px;margin:4px 0 7px}
+.sub-tbl table{font-size:11px}
+.sub-tbl thead th{background:#141a22;position:static}
+.sub-tbl tbody td{border-bottom:1px solid #161c24}
+.empty{padding:16px;color:var(--fg-faint);text-align:center;font-size:11.5px}
+
+/* ============================================================
+   CHARTS
+   ============================================================ */
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:11px}
+.chart{background:#0f141a;border:1px solid var(--border);border-radius:4px;padding:8px 10px 4px}
+.chart .ct{font-size:11px;color:#b9c5d4;margin:0 0 2px}
+.chart .cs{font-size:10.5px;color:var(--fg-faint);margin:0 0 4px}
+svg .gl{stroke:#222a34;stroke-width:1}
+svg .ax{stroke:#37424f;stroke-width:1}
+svg .lbl{fill:#6b7684;font-size:9px;font-family:var(--mono)}
+svg .ln{fill:none;stroke-width:1.6}
+svg circle.pt{stroke:#0f141a;stroke-width:1}
+
+/* ============================================================
+   SETTINGS GRID
+   ============================================================ */
+.fgrid{display:grid;grid-template-columns:200px 1fr;gap:9px 12px;align-items:center;max-width:760px}
+.fgrid label{color:var(--fg-dim);font-size:11.5px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toast{
+  position:fixed;right:14px;bottom:14px;z-index:200;max-width:420px;
+  display:flex;flex-direction:column;gap:7px;
+}
+.toast div{
+  background:#1b222c;border:1px solid var(--border2);border-left:3px solid var(--accent);
+  padding:8px 11px;border-radius:4px;font-size:11.5px;box-shadow:0 6px 20px #0008;
+}
+.toast div.err{border-left-color:var(--bad)}
+.toast div.ok{border-left-color:var(--good)}
+.toast div.warn{border-left-color:var(--warn)}
+@media (max-width:900px){
+  .fgrid{grid-template-columns:1fr}
+  .top-right{width:100%;margin-left:0}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">CMS ISSUE LEDGER<span>YouTube CMS · disputed claims &amp; reference overlaps · accumulating history</span></div>
+    <div class="top-right">
+      <div class="rpm-chip">RPM applied: <b id="rpmChip">—</b> / 1,000 views <span id="annChip"></span></div>
+      <div class="storage">
+        <span>localStorage</span>
+        <span class="bar" id="stBar"><i style="width:0"></i></span>
+        <span id="stTxt">—</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ===================== IMPORT ===================== -->
+  <section class="panel" style="margin-top:14px">
+    <h2>Import weekly CSV exports
+      <span class="sub">parsed locally · no network requests · nothing leaves this page</span>
+      <span class="spacer"></span>
+      <button class="sm" id="toggleImport">hide</button>
+    </h2>
+    <div class="body" id="importBody">
+      <div id="drop">
+        <b>Drop CSV files here</b> &nbsp;or&nbsp; <button class="sm" id="pickBtn">choose files…</button>
+        <input type="file" id="fileInput" accept=".csv,text/csv" multiple hidden>
+        <div class="note" style="margin-top:6px">
+          Expected names: <code>LE_dispute_export_M-D.csv</code>, <code>LE_ref_export_M-D.csv</code> — the snapshot date is read
+          from the filename (current year assumed) and can be overridden below before committing.
+        </div>
+      </div>
+      <div id="stageWrap"></div>
+    </div>
+  </section>
+
+  <!-- ===================== SUMMARY CARDS ===================== -->
+  <div class="cards" id="cards"></div>
+
+  <!-- ===================== TABS ===================== -->
+  <nav class="tabs" id="tabs">
+    <button data-tab="overview" class="on">Overview</button>
+    <button data-tab="overlaps">Reference Overlaps</button>
+    <button data-tab="disputes">Disputes</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+
+  <div class="view on" id="v-overview"></div>
+  <div class="view" id="v-overlaps"></div>
+  <div class="view" id="v-disputes"></div>
+  <div class="view" id="v-settings"></div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ==========================================================================
+   CMS ISSUE LEDGER — single-file, fully client-side.
+   Layers, in order, each independent of the ones below it:
+     1. UTIL      — formatting, dates, dom helpers, toasts
+     2. PARSE     — RFC4180 CSV reader + row normalisation + filename dates
+     3. STORE     — localStorage persistence (snapshots, settings, owner map)
+     4. ANALYZE   — historical union, recurrence grouping, exposure, time series
+     5. TABLE     — generic sortable/filterable/expandable table component
+     6. CHART     — tiny inline-SVG line chart
+     7. RENDER    — the four views
+     8. IMPORT    — drag/drop + staging + commit
+     9. BOOT      — wiring
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. UTIL
+   ========================================================================== */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+/** Escape text for safe insertion into HTML. */
+function esc(v){
+  return String(v == null ? "" : v)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+/** Parse a possibly comma-formatted / quoted numeric cell. Non-numeric -> 0. */
+function num(v){
+  if (v == null) return 0;
+  if (typeof v === "number") return isFinite(v) ? v : 0;
+  const s = String(v).replace(/[,$\s"']/g, "");
+  if (s === "" || s === "-") return 0;
+  const n = parseFloat(s);
+  return isFinite(n) ? n : 0;
+}
+
+const fmtInt = n => Math.round(num(n)).toLocaleString("en-US");
+function fmtMoney(n){
+  n = num(n);
+  const d = Math.abs(n) >= 100 ? 0 : 2;
+  return "$" + n.toLocaleString("en-US", {minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function fmtMoneyShort(n){
+  n = num(n);
+  const a = Math.abs(n);
+  if (a >= 1e6) return "$" + (n/1e6).toFixed(a >= 1e7 ? 1 : 2) + "M";
+  if (a >= 1e4) return "$" + (n/1e3).toFixed(a >= 1e5 ? 0 : 1) + "k";
+  return fmtMoney(n);
+}
+function fmtBytes(b){
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b/1024).toFixed(1) + " KB";
+  return (b/1048576).toFixed(2) + " MB";
+}
+
+/* --- dates: snapshot dates are always stored as ISO "YYYY-MM-DD" strings --- */
+const pad2 = n => String(n).padStart(2, "0");
+function isoFrom(y, m, d){ return y + "-" + pad2(m) + "-" + pad2(d); }
+function isoToday(){ const d = new Date(); return isoFrom(d.getFullYear(), d.getMonth()+1, d.getDate()); }
+function isoValid(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s || "") && !isNaN(Date.parse(s + "T00:00:00")); }
+function isoToTime(s){ return Date.parse(s + "T00:00:00"); }
+function daysBetween(a, b){ return Math.round((isoToTime(b) - isoToTime(a)) / 86400000); }
+function shortDate(s){ return isoValid(s) ? s.slice(5) : (s || "—"); }
+
+/**
+ * ISO-8601 week key (e.g. "2026-W12") for a snapshot date. Used for
+ * "distinct weeks seen" so that two exports inside one calendar week do not
+ * inflate the recurrence signal. Raw snapshot count is shown alongside.
+ */
+function isoWeekKey(s){
+  const d = new Date(isoToTime(s));
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;             // Mon=1..Sun=7
+  t.setUTCDate(t.getUTCDate() + 4 - day);     // nearest Thursday
+  const yStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const wk = Math.ceil(((t - yStart) / 86400000 + 1) / 7);
+  return t.getUTCFullYear() + "-W" + pad2(wk);
+}
+
+/** Transient message, bottom-right. kind: ""|"ok"|"warn"|"err" */
+function toast(msg, kind, ms){
+  const box = $("#toast");
+  const el = document.createElement("div");
+  if (kind) el.className = kind;
+  el.innerHTML = msg;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), ms || (kind === "err" ? 10000 : 4500));
+}
+
+/** Copy text to clipboard with a synchronous fallback for non-secure contexts. */
+function copyText(text, label){
+  const done = () => toast((label || "Copied") + " — " + fmtInt(text.split("\n").length - 1) + " rows on clipboard", "ok");
+  const fail = () => toast("Clipboard blocked by the browser. Nothing was sent anywhere — try again after clicking the page.", "err");
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(done, fail);
+    return;
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.cssText = "position:fixed;left:-9999px;top:0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch(e){ ok = false; }
+  ta.remove();
+  ok ? done() : fail();
+}
+
+/** Trigger a local download from an in-memory blob (no network involved). */
+function download(filename, text, mime){
+  const blob = new Blob([text], {type: mime || "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+
+/* ==========================================================================
+   2. PARSE
+   ========================================================================== */
+
+/** The export schema, in file order. Stored per-snapshot so rows can be arrays. */
+const COLS = [
+  "Issue ID","Issue Type","Other Party","Expiry Date","Expiry Time","Asset Name","Asset Type",
+  "Asset Created On","Asset ID","Reference ID","ISRC","UPC","Custom ID","Labels","ISWC",
+  "Overlapping Asset ID","Overlapping Asset Name","Video ID","Video Title","Channel Name",
+  "Channel ID","Claim ID","Match Type","Engaged Views Affected Daily","Engaged Views Lifetime",
+  "Claimed Videos Affected","Duration Time (Seconds)","Duration Percentage Reference",
+  "Duration Percentage Video","Status","Status Detail","Link To Issue"
+];
+
+/* Columns deliberately parsed and retained on the raw record but never used
+   for any metric in this tool (per spec). Listed in Settings for transparency. */
+const IGNORED_COLS = [
+  "Expiry Date","Expiry Time","Asset Created On","Duration Time (Seconds)",
+  "Duration Percentage Reference","Duration Percentage Video","Asset Type","ISWC"
+];
+
+const T_OVERLAP = "Reference overlap";
+const T_DISPUTE = "Disputed claim";
+
+/**
+ * RFC4180 CSV parser. Handles quoted fields, embedded commas/newlines,
+ * doubled quotes as escapes, CR/LF/CRLF line endings and a leading BOM.
+ * Returns an array of string arrays. Deliberately not split(",").
+ */
+function parseCSV(text){
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = [];
+  let row = [], field = "", i = 0, inQ = false;
+  const n = text.length;
+  while (i < n){
+    const c = text[i];
+    if (inQ){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i += 2; continue; }
+        inQ = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if (c === '"'){ inQ = true; i++; continue; }
+    if (c === ','){ row.push(field); field = ""; i++; continue; }
+    if (c === '\r'){
+      if (text[i+1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = ""; i++; continue;
+    }
+    if (c === '\n'){ row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+    field += c; i++;
+  }
+  // flush trailing field/row unless the file ended on a clean newline
+  if (field !== "" || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+/**
+ * Turn raw CSV rows into normalised records.
+ * Header names are matched case/space-insensitively so minor export drift
+ * (extra spaces, casing) does not break the mapping. Unknown columns are kept.
+ */
+function normalizeCSV(rawRows){
+  if (!rawRows.length) return {records: [], headers: [], unknown: [], missing: COLS.slice()};
+  const norm = s => String(s || "").replace(/^﻿/, "").trim().toLowerCase().replace(/\s+/g, " ");
+  const header = rawRows[0].map(h => String(h || "").trim());
+  const headerNorm = header.map(norm);
+
+  const canonByNorm = {};
+  COLS.forEach(c => canonByNorm[norm(c)] = c);
+
+  // final column list = canonical schema + any extra columns present in the file
+  const unknown = [];
+  const colOf = headerNorm.map((h, idx) => {
+    if (canonByNorm[h]) return canonByNorm[h];
+    const label = header[idx] || ("col" + idx);
+    unknown.push(label);
+    return label;
+  });
+  const present = new Set(colOf);
+  const missing = COLS.filter(c => !present.has(c));
+  const outCols = COLS.concat(unknown);
+  const idxOf = {};
+  outCols.forEach((c, i) => idxOf[c] = i);
+
+  const records = [];
+  for (let r = 1; r < rawRows.length; r++){
+    const src = rawRows[r];
+    // skip fully blank lines
+    if (src.length === 1 && String(src[0]).trim() === "") continue;
+    if (!src.some(v => String(v).trim() !== "")) continue;
+    const rec = new Array(outCols.length).fill("");
+    for (let c = 0; c < src.length && c < colOf.length; c++){
+      rec[idxOf[colOf[c]]] = String(src[c] == null ? "" : src[c]).trim();
+    }
+    records.push(rec);
+  }
+  return {records, cols: outCols, headers: header, unknown, missing};
+}
+
+/**
+ * Derive snapshot date + issue-type hint from a filename.
+ * LE_dispute_export_3-14.csv -> {iso:"2026-03-14", typeHint:"Disputed claim"}
+ * Falls back to any trailing M-D (or M-D-YY / M-D-YYYY) pattern.
+ */
+function dateFromFilename(name){
+  const base = String(name || "").replace(/\.csv$/i, "");
+  let typeHint = null;
+  if (/(^|[_\-.])ref(erence)?([_\-.]|$)/i.test(base) || /overlap/i.test(base)) typeHint = T_OVERLAP;
+  if (/disput/i.test(base) || /claim/i.test(base)) typeHint = T_DISPUTE;
+
+  const m = base.match(/(\d{1,2})[-_.](\d{1,2})(?:[-_.](\d{2,4}))?\s*$/);
+  let iso = null, guessed = false;
+  if (m){
+    const mo = parseInt(m[1], 10), da = parseInt(m[2], 10);
+    let yr = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
+    if (yr < 100) yr += 2000;
+    if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) iso = isoFrom(yr, mo, da);
+  }
+  if (!iso){ iso = isoToday(); guessed = true; }
+  return {iso, typeHint, guessed};
+}
+
+
+/* ==========================================================================
+   3. STORE  — everything persisted, nothing implicit
+   ========================================================================== */
+const LS = {
+  snaps:   "cmsledger.snapshots.v1",
+  settings:"cmsledger.settings.v1",
+  owners:  "cmsledger.owners.v1"
+};
+
+const DEFAULT_SETTINGS = {
+  rpm: 0.60,          // conservative default; music-video CMS RPMs vary widely
+  annualizeOverlap: false,
+  hideUnmapped: false
+};
+
+/**
+ * localStorage is not always there: blocked site data, private-browsing modes,
+ * and opaque origins (data:/file: in some browsers) make even *reading* the
+ * property throw. Probe once, then route every access through a shim that
+ * falls back to an in-memory map so the UI still works — loudly degraded,
+ * never silently half-rendered.
+ */
+const LSTORE = (function(){
+  const mem = new Map();
+  let ok = false, why = "";
+  try {
+    const probe = "cmsledger.__probe";
+    localStorage.setItem(probe, "1");
+    localStorage.removeItem(probe);
+    ok = true;
+  } catch(err){
+    ok = false;
+    why = (err && err.name ? err.name : "Error") + (err && err.message ? ": " + err.message : "");
+  }
+  return {
+    available: ok,
+    reason: why,
+    get(k){ if (!ok) return mem.has(k) ? mem.get(k) : null; return localStorage.getItem(k); },
+    set(k, v){ if (!ok){ mem.set(k, v); return; } localStorage.setItem(k, v); },
+    del(k){ if (!ok){ mem.delete(k); return; } localStorage.removeItem(k); }
+  };
+})();
+
+const Store = {
+  /* snapshots: { "<ISO date>|<Issue Type>": {date, issueType, files:[], importedAt, cols:[], rows:[[...]]} }
+     Rows are stored as positional arrays against a per-snapshot `cols` list —
+     roughly 3x smaller in localStorage than an array of objects. */
+  snaps: {},
+  settings: Object.assign({}, DEFAULT_SETTINGS),
+  owners: {},          // Channel ID -> Owner Name
+
+  key(date, type){ return date + "|" + type; },
+
+  load(){
+    try { this.snaps = JSON.parse(LSTORE.get(LS.snaps) || "{}") || {}; }
+    catch(e){ this.snaps = {}; toast("Stored snapshots were unreadable and have been ignored (not deleted).", "err"); }
+    try { this.settings = Object.assign({}, DEFAULT_SETTINGS, JSON.parse(LSTORE.get(LS.settings) || "{}")); }
+    catch(e){ this.settings = Object.assign({}, DEFAULT_SETTINGS); }
+    try { this.owners = JSON.parse(LSTORE.get(LS.owners) || "{}") || {}; }
+    catch(e){ this.owners = {}; }
+  },
+
+  /** Write one key. Returns true on success; on quota failure warns loudly and rolls back. */
+  write(lsKey, value, rollback){
+    const json = JSON.stringify(value);
+    try {
+      LSTORE.set(lsKey, json);
+      return true;
+    } catch(err){
+      const quota = err && (err.name === "QuotaExceededError" || err.name === "NS_ERROR_DOM_QUOTA_REACHED" || err.code === 22);
+      if (typeof rollback === "function") rollback();
+      toast(
+        "<b>Storage write FAILED" + (quota ? " — localStorage is full" : "") + ".</b><br>" +
+        esc(err && err.message ? err.message : String(err)) +
+        "<br>Nothing was saved. Export your data to JSON, then clear older snapshots before importing more.",
+        "err", 30000
+      );
+      return false;
+    }
+  },
+
+  saveSnaps(prev){ return this.write(LS.snaps, this.snaps, prev ? () => { this.snaps = prev; } : null); },
+  saveSettings(){ return this.write(LS.settings, this.settings); },
+  saveOwners(){ return this.write(LS.owners, this.owners); },
+
+  /** Bytes used by this app's keys, and a rough share of a 5 MB budget. */
+  usage(){
+    let bytes = 0;
+    Object.values(LS).forEach(k => {
+      let v = null;
+      try { v = LSTORE.get(k); } catch(e){ v = null; }
+      if (v) bytes += (k.length + v.length) * 2;   // UTF-16 code units
+    });
+    return {bytes, budget: 5 * 1024 * 1024, persistent: LSTORE.available};
+  },
+
+  clearAll(){
+    Object.values(LS).forEach(k => { try { LSTORE.del(k); } catch(e){} });
+    this.snaps = {};
+    this.settings = Object.assign({}, DEFAULT_SETTINGS);
+    this.owners = {};
+  },
+
+  exportBundle(){
+    return {
+      format: "cms-issue-ledger",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      snapshots: this.snaps,
+      settings: this.settings,
+      owners: this.owners
+    };
+  }
+};
+
+
+/* ==========================================================================
+   4. ANALYZE
+   ========================================================================== */
+const Analyze = {
+  /** Flat historical union of every snapshot, hydrated into objects. */
+  all: [],
+  overlaps: [],
+  disputes: [],
+  dates: [],        // sorted distinct snapshot dates
+  weeks: [],        // sorted distinct ISO week keys
+  /** latest observation of each Issue ID (the row used for all exposure math) */
+  latest: new Map(),
+  /** Issue ID -> {type, dates:[], row} for the "held open" (type A) analysis */
+  byIssue: new Map(),
+
+  /* ---------- exposure ---------- */
+  rpm(){ return num(Store.settings.rpm); },
+
+  /** Disputes: realised exposure from lifetime engaged views. */
+  expDisputeLifetime(r){ return num(r["Engaged Views Lifetime"]) * this.rpm() / 1000; },
+  /** Disputes: ongoing daily bleed. */
+  expDisputeDaily(r){ return num(r["Engaged Views Affected Daily"]) * this.rpm() / 1000; },
+  /** Overlaps: daily views x claimed videos x RPM/1000, optionally annualised. */
+  expOverlap(r){
+    const base = num(r["Engaged Views Affected Daily"]) * num(r["Claimed Videos Affected"]) * this.rpm() / 1000;
+    return Store.settings.annualizeOverlap ? base * 365 : base;
+  },
+  /** The single "total exposure" figure used for default sorting, per type. */
+  exposure(r){
+    return r["Issue Type"] === T_OVERLAP ? this.expOverlap(r) : this.expDisputeLifetime(r);
+  },
+
+  /* ---------- build ---------- */
+  build(){
+    const all = [];
+    const keys = Object.keys(Store.snaps).sort();
+
+    for (const k of keys){
+      const s = Store.snaps[k];
+      if (!s || !Array.isArray(s.rows)) continue;
+      const cols = s.cols || COLS;
+      const seenInSnap = new Set();       // dedupe by Issue ID + snapshot date
+      for (const arr of s.rows){
+        const o = {};
+        for (let i = 0; i < cols.length; i++) o[cols[i]] = arr[i] == null ? "" : arr[i];
+        const id = o["Issue ID"] || "";
+        const dk = id + "|" + s.date;
+        if (id && seenInSnap.has(dk)) continue;
+        if (id) seenInSnap.add(dk);
+        o.__date = s.date;
+        o.__week = isoWeekKey(s.date);
+        o["Issue Type"] = o["Issue Type"] || s.issueType || "";
+        all.push(o);
+      }
+    }
+
+    all.sort((a, b) => a.__date < b.__date ? -1 : a.__date > b.__date ? 1 : 0);
+
+    this.all      = all;
+    this.overlaps = all.filter(r => r["Issue Type"] === T_OVERLAP);
+    this.disputes = all.filter(r => r["Issue Type"] === T_DISPUTE);
+    this.dates    = Array.from(new Set(all.map(r => r.__date))).sort();
+    this.weeks    = Array.from(new Set(all.map(r => r.__week))).sort();
+
+    // latest observation per Issue ID + full observation history per Issue ID
+    this.latest = new Map();
+    this.byIssue = new Map();
+    for (const r of all){
+      const id = r["Issue ID"];
+      if (!id) continue;
+      const prev = this.latest.get(id);
+      if (!prev || r.__date >= prev.__date) this.latest.set(id, r);
+      let h = this.byIssue.get(id);
+      if (!h){ h = {id, type: r["Issue Type"], dates: [], rows: []}; this.byIssue.set(id, h); }
+      if (h.dates.indexOf(r.__date) === -1) h.dates.push(r.__date);
+      h.rows.push(r);
+    }
+    for (const h of this.byIssue.values()){
+      h.dates.sort();
+      h.first = h.dates[0];
+      h.last = h.dates[h.dates.length - 1];
+      h.daysHeld = daysBetween(h.first, h.last);
+      h.row = this.latest.get(h.id);
+    }
+  },
+
+  /**
+   * TYPE B RECURRENCE: group rows by an entity key; the same entity producing
+   * DIFFERENT Issue IDs across snapshots is the escalation signal.
+   *
+   * keyFn(row) -> string | string[] | null   (arrays let one row join several
+   *                                           groups, e.g. multi-value ISRC)
+   * labelFn(row, key) -> {label, sub}        display, taken from the newest row
+   */
+  recurrence(rows, keyFn, labelFn){
+    const groups = new Map();
+    for (const r of rows){
+      let ks = keyFn(r);
+      if (ks == null) continue;
+      if (!Array.isArray(ks)) ks = [ks];
+      for (const k of ks){
+        if (k == null || k === "") continue;
+        let g = groups.get(k);
+        if (!g){
+          g = {key: k, label: "", sub: "", issueIds: new Set(), dates: new Set(),
+               weeks: new Set(), rows: [], newest: r};
+          groups.set(k, g);
+        }
+        const id = r["Issue ID"] || ("#" + g.rows.length);
+        g.issueIds.add(id);
+        g.dates.add(r.__date);
+        g.weeks.add(r.__week);
+        g.rows.push(r);
+        if (r.__date >= g.newest.__date) g.newest = r;
+      }
+    }
+
+    const out = [];
+    for (const g of groups.values()){
+      const dates = Array.from(g.dates).sort();
+      const issues = Array.from(g.issueIds)
+        .map(id => this.latest.get(id) || g.rows.find(r => r["Issue ID"] === id))
+        .filter(Boolean);
+
+      // Exposure is summed over the LATEST observation of each distinct Issue
+      // ID, so an issue seen in five snapshots is never counted five times.
+      let exposure = 0, dailyExp = 0, lifeViews = 0, dailyViews = 0, claimedVids = 0;
+      for (const r of issues){
+        exposure    += this.exposure(r);
+        dailyExp    += this.expDisputeDaily(r);
+        lifeViews   += num(r["Engaged Views Lifetime"]);
+        dailyViews  += num(r["Engaged Views Affected Daily"]);
+        claimedVids += num(r["Claimed Videos Affected"]);
+      }
+
+      const lab = labelFn ? labelFn(g.newest, g.key) : {label: g.key, sub: ""};
+      out.push({
+        key: g.key,
+        label: lab.label || g.key,
+        sub: lab.sub || "",
+        issueCount: g.issueIds.size,
+        weekCount: g.weeks.size,
+        snapCount: g.dates.size,
+        first: dates[0],
+        last: dates[dates.length - 1],
+        exposure, dailyExp, lifeViews, dailyViews, claimedVids,
+        issues: issues.sort((a, b) => this.exposure(b) - this.exposure(a)),
+        newest: g.newest
+      });
+    }
+    return out;
+  },
+
+  /** Per-snapshot-date series for one issue type. */
+  series(type){
+    const out = [];
+    for (const d of this.dates){
+      const rows = this.all.filter(r => r.__date === d && r["Issue Type"] === type);
+      if (!rows.length && !Store.snaps[Store.key(d, type)]) continue;   // no export that week
+      const ids = new Set(rows.map(r => r["Issue ID"]));
+      let scale = 0, exposure = 0, daily = 0;
+      for (const r of rows){
+        scale    += type === T_OVERLAP ? num(r["Claimed Videos Affected"]) : num(r["Engaged Views Lifetime"]);
+        exposure += this.exposure(r);
+        daily    += num(r["Engaged Views Affected Daily"]);
+      }
+      out.push({date: d, issues: ids.size || rows.length, scale, exposure, daily});
+    }
+    return out;
+  },
+
+  /** Owner label for a dispute row: mapping first, Channel Name fallback. */
+  ownerOf(r){
+    const cid = r["Channel ID"] || "";
+    const mapped = cid && Store.owners[cid] ? String(Store.owners[cid]).trim() : "";
+    if (mapped) return {name: mapped, mapped: true};
+    return {name: (r["Channel Name"] || cid || "(unknown channel)"), mapped: false};
+  }
+};
+
+/* ---- entity key helpers (also used by the label functions) ---- */
+
+/** Canonical, direction-insensitive key for an asset-vs-asset overlap pair. */
+function pairKey(r){
+  const a = (r["Asset ID"] || "").trim();
+  const b = (r["Overlapping Asset ID"] || "").trim();
+  if (!a || !b) return null;
+  return a < b ? a + " ⇄ " + b : b + " ⇄ " + a;
+}
+/** ISRC can hold multiple pipe-delimited values — each is its own entity. */
+function isrcKeys(r){
+  return String(r["ISRC"] || "").split("|").map(s => s.trim()).filter(Boolean);
+}
+function firstNonEmpty(){
+  for (let i = 0; i < arguments.length; i++){
+    const v = arguments[i];
+    if (v != null && String(v).trim() !== "") return String(v).trim();
+  }
+  return "";
+}
+
+
+/* ==========================================================================
+   5. TABLE — generic sortable / filterable / expandable component
+   ========================================================================== */
+const TABLES = {};        // id -> spec (kept so a re-render needs no re-analysis)
+const TSTATE = {};        // id -> {sort, dir, filter, open:Set}
+
+/**
+ * spec = {
+ *   id, title, sub, note,
+ *   cols: [{key,label,cls,type:'num'|'str',get(row),fmt(row)}],
+ *   rows: [...],
+ *   sort: default sort key, dir: 'asc'|'desc',
+ *   expand(row) -> html | null,
+ *   tsv: true
+ * }
+ */
+function regTable(spec){
+  TABLES[spec.id] = spec;
+  if (!TSTATE[spec.id]){
+    TSTATE[spec.id] = {sort: spec.sort || null, dir: spec.dir || "desc", filter: "", open: new Set()};
+  }
+  return tableHTML(spec.id);
+}
+
+function tableState(id){ return TSTATE[id]; }
+
+/** Rows after filtering + sorting, in render order. */
+function tableRows(id){
+  const spec = TABLES[id], st = TSTATE[id];
+  let rows = spec.rows.slice();
+
+  const f = (st.filter || "").trim().toLowerCase();
+  if (f){
+    const terms = f.split(/\s+/);
+    rows = rows.filter(r => {
+      const hay = spec.cols.map(c => {
+        const v = c.get ? c.get(r) : r[c.key];
+        return v == null ? "" : String(v);
+      }).join("  ").toLowerCase() + " " + String(r.key || "").toLowerCase();
+      return terms.every(t => hay.indexOf(t) !== -1);
+    });
+  }
+
+  if (st.sort){
+    const col = spec.cols.find(c => c.key === st.sort);
+    if (col){
+      const dir = st.dir === "asc" ? 1 : -1;
+      rows.sort((a, b) => {
+        let av = col.get ? col.get(a) : a[col.key];
+        let bv = col.get ? col.get(b) : b[col.key];
+        if (col.type === "num"){
+          av = num(av); bv = num(bv);
+          return av === bv ? 0 : (av < bv ? -dir : dir);
+        }
+        av = String(av == null ? "" : av).toLowerCase();
+        bv = String(bv == null ? "" : bv).toLowerCase();
+        return av === bv ? 0 : (av < bv ? -dir : dir);
+      });
+    }
+  }
+  return rows;
+}
+
+function tableHTML(id){
+  const spec = TABLES[id], st = TSTATE[id];
+  const rows = tableRows(id);
+
+  let h = '<section class="panel" data-table="' + esc(id) + '">';
+  h += '<h2>' + esc(spec.title);
+  if (spec.sub) h += ' <span class="sub">' + spec.sub + '</span>';
+  h += '</h2>';
+
+  h += '<div class="tbl-head">';
+  h += '<input type="text" data-act="filter" data-id="' + esc(id) + '" placeholder="filter…" value="' + esc(st.filter) + '">';
+  h += '<span class="count">' + fmtInt(rows.length) + ' of ' + fmtInt(spec.rows.length) + ' rows</span>';
+  h += '<span class="spacer"></span>';
+  if (spec.expand) h += '<button class="sm" data-act="expand-all" data-id="' + esc(id) + '">expand all</button>' +
+                        '<button class="sm" data-act="collapse-all" data-id="' + esc(id) + '">collapse</button>';
+  if (spec.tsv !== false) h += '<button class="sm" data-act="tsv" data-id="' + esc(id) + '">Copy as TSV</button>';
+  h += '</div>';
+
+  if (!spec.rows.length){
+    h += '<div class="empty">No data yet — import a CSV export above.</div>';
+    if (spec.note) h += '<div class="body" style="padding-top:0"><p class="note">' + spec.note + '</p></div>';
+    return h + '</section>';
+  }
+
+  h += '<div class="scroll"><table><thead><tr>';
+  if (spec.expand) h += '<th class="na"></th>';
+  for (const c of spec.cols){
+    const on = st.sort === c.key;
+    h += '<th class="' + (c.type === "num" ? "num " : "") + '" data-act="sort" data-id="' + esc(id) + '" data-col="' + esc(c.key) + '"' +
+         (c.title ? ' title="' + esc(c.title) + '"' : '') + '>' + esc(c.label) +
+         (on ? '<span class="ar">' + (st.dir === "asc" ? "▲" : "▼") + '</span>' : '') + '</th>';
+  }
+  h += '</tr></thead><tbody>';
+
+  rows.forEach((r, i) => {
+    const rk = String(r.key != null ? r.key : i);
+    const isOpen = st.open.has(rk);
+    h += '<tr>';
+    if (spec.expand){
+      h += '<td><span class="tg" data-act="toggle" data-id="' + esc(id) + '" data-row="' + esc(rk) + '">' +
+           (isOpen ? "−" : "+") + '</span></td>';
+    }
+    for (const c of spec.cols){
+      const cls = (c.type === "num" ? "num " : "") + (c.cls || "");
+      h += '<td class="' + cls.trim() + '">' + (c.fmt ? c.fmt(r) : esc(c.get ? c.get(r) : r[c.key])) + '</td>';
+    }
+    h += '</tr>';
+    if (isOpen && spec.expand){
+      h += '<tr class="exp-row"><td colspan="' + (spec.cols.length + 1) + '" style="padding:0 8px">' +
+           spec.expand(r) + '</td></tr>';
+    }
+  });
+
+  h += '</tbody></table></div>';
+  if (spec.note) h += '<div class="body" style="padding-top:8px"><p class="note">' + spec.note + '</p></div>';
+  return h + '</section>';
+}
+
+/** Tab-separated dump of the current filtered+sorted view (group rows only). */
+function tableTSV(id){
+  const spec = TABLES[id];
+  const rows = tableRows(id);
+  const lines = [spec.cols.map(c => c.label).join("\t")];
+  for (const r of rows){
+    lines.push(spec.cols.map(c => {
+      let v = c.get ? c.get(r) : r[c.key];
+      if (c.type === "num") v = num(v);
+      else v = String(v == null ? "" : v).replace(/[\t\r\n]+/g, " ");
+      return v;
+    }).join("\t"));
+  }
+  return lines.join("\n") + "\n";
+}
+
+/** Replace one table in place (used by sort/filter/expand — no full re-render). */
+function refreshTable(id){
+  const el = document.querySelector('[data-table="' + id + '"]');
+  if (!el) return;
+  const focus = document.activeElement;
+  const wasFilter = focus && focus.dataset && focus.dataset.act === "filter" && focus.dataset.id === id;
+  const caret = wasFilter ? focus.selectionStart : null;
+  el.outerHTML = tableHTML(id);
+  if (wasFilter){
+    const inp = document.querySelector('[data-table="' + id + '"] [data-act="filter"]');
+    if (inp){ inp.focus(); try { inp.setSelectionRange(caret, caret); } catch(e){} }
+  }
+}
+
+/* ---- shared column builders used by every recurrence table ---- */
+
+/** The link-list / detail sub-table shown when a group row is expanded. */
+function expandIssues(g, kind){
+  const isOv = kind === "overlap";
+  let h = '<div class="sub-tbl"><table><thead><tr>' +
+    '<th>Issue ID</th><th>Last seen</th><th>Snaps</th><th>Days held</th><th>Asset</th>' +
+    (isOv ? '<th>Overlapping asset</th><th class="num">Claimed videos</th>'
+          : '<th>Channel</th><th>Video</th><th class="num">Lifetime views</th>') +
+    '<th class="num">Daily views</th><th class="num">Exposure</th><th>Status detail</th><th>Link</th>' +
+    '</tr></thead><tbody>';
+
+  for (const r of g.issues){
+    const hist = Analyze.byIssue.get(r["Issue ID"]) || {dates: [r.__date], daysHeld: 0};
+    const link = String(r["Link To Issue"] || "");
+    h += '<tr>' +
+      '<td class="id">' + esc(r["Issue ID"]) + '</td>' +
+      '<td class="dim">' + esc(hist.last || r.__date) + '</td>' +
+      '<td class="num">' + hist.dates.length + '</td>' +
+      '<td class="num' + (hist.daysHeld >= 14 ? ' hot2' : '') + '">' + hist.daysHeld + '</td>' +
+      '<td class="wide">' + esc(r["Asset Name"] || r["Asset ID"]) + '<br><span style="color:#5f6b7a">' + esc(r["Asset ID"]) + '</span></td>';
+    if (isOv){
+      h += '<td class="wide">' + esc(r["Overlapping Asset Name"] || r["Overlapping Asset ID"]) +
+           '<br><span style="color:#5f6b7a">' + esc(r["Overlapping Asset ID"]) + '</span></td>' +
+           '<td class="num">' + fmtInt(r["Claimed Videos Affected"]) + '</td>';
+    } else {
+      const own = Analyze.ownerOf(r);
+      h += '<td class="wide">' + esc(r["Channel Name"] || r["Channel ID"]) +
+           (own.mapped ? '<br><span class="badge ok">' + esc(own.name) + '</span>' : '') + '</td>' +
+           '<td class="wide">' + esc(r["Video Title"] || r["Video ID"] || "") + '</td>' +
+           '<td class="num">' + fmtInt(r["Engaged Views Lifetime"]) + '</td>';
+    }
+    h += '<td class="num">' + fmtInt(r["Engaged Views Affected Daily"]) + '</td>' +
+      '<td class="money">' + fmtMoney(Analyze.exposure(r)) + '</td>' +
+      '<td class="dim">' + esc(r["Status Detail"] || "—") + '</td>' +
+      '<td>' + (/^https?:\/\//i.test(link)
+                  ? '<a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">open ↗</a>'
+                  : '<span class="dim">—</span>') + '</td>' +
+      '</tr>';
+  }
+  return h + '</tbody></table></div>';
+}
+
+/**
+ * Build a full recurrence-table spec. `kind` selects the scale-metric columns.
+ * Column set is identical across tables per spec: entity, distinct issues,
+ * distinct weeks, first seen, last seen, total exposure (+ raw views), expand.
+ */
+function recurrenceSpec(id, title, sub, note, groups, kind, entityLabel){
+  const isOv = kind === "overlap";
+  const cols = [
+    {key:"label", label: entityLabel || "Entity", type:"str",
+     get: r => r.label,
+     fmt: r => '<span style="white-space:normal">' + esc(r.label) + '</span>' +
+               (r.sub ? '<br><span style="color:#5f6b7a;font-size:10.5px">' + esc(r.sub) + '</span>' : ''),
+     cls:"wide"},
+    /* The stable identifier(s) behind the display name — its own column so a
+       "Copy as TSV" paste into Sheets keeps name and ID in separate cells. */
+    {key:"sub", label:"identifier", type:"str", cls:"id",
+     title:"Stable ID(s) behind the display name — names drift, IDs do not",
+     get: r => r.sub || "",
+     fmt: r => r.sub ? esc(r.sub) : '<span class="dim">—</span>',
+     omitIfEmpty: true},
+    {key:"issueCount", label:"issues", type:"num", title:"Distinct Issue IDs generated by this entity",
+     fmt: r => (r.issueCount >= 3 ? '<span class="hot3">' : r.issueCount === 2 ? '<span class="hot2">' : '<span>') + fmtInt(r.issueCount) + '</span>'},
+    {key:"weekCount", label:"wks", type:"num", title:"Distinct ISO weeks in which this entity appeared",
+     fmt: r => (r.weekCount >= 3 ? '<span class="hot3">' : r.weekCount === 2 ? '<span class="hot2">' : '<span>') + fmtInt(r.weekCount) + '</span>'},
+    {key:"snapCount", label:"snaps", type:"num", title:"Distinct snapshot dates (exports) containing this entity",
+     fmt: r => fmtInt(r.snapCount)},
+    {key:"first", label:"first seen", type:"str", fmt: r => '<span class="dim">' + esc(r.first) + '</span>'},
+    {key:"last",  label:"last seen",  type:"str", fmt: r => esc(r.last)}
+  ];
+
+  if (isOv){
+    cols.push({key:"claimedVids", label:"claimed videos", type:"num", title:"Scale metric for overlaps", fmt: r => fmtInt(r.claimedVids)});
+    cols.push({key:"dailyViews", label:"daily views", type:"num", fmt: r => fmtInt(r.dailyViews)});
+  } else {
+    cols.push({key:"lifeViews", label:"lifetime views", type:"num", title:"Scale metric for disputes", fmt: r => fmtInt(r.lifeViews)});
+    cols.push({key:"dailyViews", label:"daily views", type:"num", fmt: r => fmtInt(r.dailyViews)});
+  }
+
+  cols.push({key:"exposure", label:"total exposure", type:"num",
+             title:"Revenue at risk at the current RPM — see the formula note under the table",
+             fmt: r => '<b>' + fmtMoney(r.exposure) + '</b>', cls:"money"});
+  if (!isOv){
+    cols.push({key:"dailyExp", label:"daily bleed", type:"num",
+               title:"Engaged Views Affected Daily x RPM / 1000", fmt: r => fmtMoney(r.dailyExp), cls:"money"});
+  }
+
+  // drop columns that would be blank for every group in this particular table
+  const used = cols.filter(c => !c.omitIfEmpty || groups.some(g => String(c.get(g) || "") !== ""));
+
+  return regTable({
+    id, title, sub, note, cols: used, rows: groups,
+    sort:"exposure", dir:"desc",
+    expand: g => expandIssues(g, kind),
+    tsv: true
+  });
+}
+
+
+/* ==========================================================================
+   6. CHART — inline SVG, no library
+   ========================================================================== */
+/**
+ * points: [{label, value}]  (label = snapshot date)
+ * opts:   {color, fmt, title, sub}
+ */
+function lineChart(points, opts){
+  opts = opts || {};
+  const W = 340, H = 132, P = {l: 52, r: 10, t: 10, b: 20};
+  const fmt = opts.fmt || fmtInt;
+  const color = opts.color || "#4a9eff";
+
+  let h = '<div class="chart">';
+  if (opts.title) h += '<p class="ct">' + esc(opts.title) + '</p>';
+  if (opts.sub)   h += '<p class="cs">' + esc(opts.sub) + '</p>';
+
+  if (!points.length){
+    return h + '<div class="empty" style="padding:22px">no snapshots</div></div>';
+  }
+
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const max = Math.max.apply(null, points.map(p => num(p.value)).concat([0]));
+  const top = max <= 0 ? 1 : max * 1.12;
+  const x = i => points.length === 1 ? P.l + iw / 2 : P.l + (i * iw) / (points.length - 1);
+  const y = v => P.t + ih - (num(v) / top) * ih;
+
+  h += '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" role="img">';
+  // gridlines + y labels
+  [0, .5, 1].forEach(f => {
+    const yy = (P.t + ih - f * ih).toFixed(1);
+    h += '<line class="gl" x1="' + P.l + '" y1="' + yy + '" x2="' + (W - P.r) + '" y2="' + yy + '"/>';
+    h += '<text class="lbl" x="' + (P.l - 5) + '" y="' + (+yy + 3).toFixed(1) + '" text-anchor="end">' +
+         esc(fmt(top * f)) + '</text>';
+  });
+  h += '<line class="ax" x1="' + P.l + '" y1="' + P.t + '" x2="' + P.l + '" y2="' + (P.t + ih) + '"/>';
+
+  // line + area
+  const pts = points.map((p, i) => x(i).toFixed(1) + "," + y(p.value).toFixed(1));
+  if (points.length > 1){
+    h += '<polygon points="' + P.l + ',' + (P.t + ih) + ' ' + pts.join(" ") + ' ' + (W - P.r) + ',' + (P.t + ih) +
+         '" fill="' + color + '" opacity="0.10"/>';
+  }
+  h += '<polyline class="ln" stroke="' + color + '" points="' + pts.join(" ") + '"/>';
+  points.forEach((p, i) => {
+    h += '<circle class="pt" cx="' + x(i).toFixed(1) + '" cy="' + y(p.value).toFixed(1) + '" r="2.6" fill="' + color + '">' +
+         '<title>' + esc(p.label + ": " + fmt(p.value)) + '</title></circle>';
+  });
+  // x labels: first, middle, last (avoids overlap on dense histories)
+  const idxs = points.length <= 3
+    ? points.map((_, i) => i)
+    : Array.from(new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]));
+  idxs.forEach(i => {
+    const anchor = i === 0 ? "start" : i === points.length - 1 ? "end" : "middle";
+    h += '<text class="lbl" x="' + x(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + anchor + '">' +
+         esc(shortDate(points[i].label)) + '</text>';
+  });
+  h += '</svg></div>';
+  return h;
+}
+
+
+/* ==========================================================================
+   7. RENDER
+   ========================================================================== */
+const RPM_NOTE = () =>
+  'All dollar figures use RPM <b>' + fmtMoney(Store.settings.rpm) + ' per 1,000 views</b> (editable in Settings). ' +
+  'These are <b>exposure / revenue at risk</b>, not lost revenue — on an overlap the money is typically held or split pending resolution. ' +
+  'Raw view counts sit beside every dollar figure so the arithmetic is auditable.';
+
+const OV_FORMULA = () =>
+  'Overlap exposure = Engaged Views Affected Daily × Claimed Videos Affected × RPM ÷ 1,000' +
+  (Store.settings.annualizeOverlap ? ' × 365 (<b>annualised</b>)' : ' (per day — toggle annualised in Settings)') +
+  '. Exposure is summed over the newest observation of each distinct Issue ID, so an issue held open across weeks is counted once. ' +
+  RPM_NOTE();
+
+const DP_FORMULA = () =>
+  'Dispute realised exposure = Engaged Views Lifetime × RPM ÷ 1,000. Daily bleed = Engaged Views Affected Daily × RPM ÷ 1,000. ' +
+  'Exposure is summed over the newest observation of each distinct Issue ID. ' + RPM_NOTE();
+
+function render(){
+  Analyze.build();
+  renderChips();
+  renderCards();
+  renderOverview();
+  renderOverlaps();
+  renderDisputes();
+  renderSettings();
+  renderStorage();
+}
+
+function renderChips(){
+  $("#rpmChip").textContent = fmtMoney(Store.settings.rpm);
+  $("#annChip").innerHTML = Store.settings.annualizeOverlap
+    ? '&nbsp;<span class="badge ov">overlaps annualised ×365</span>'
+    : '&nbsp;<span class="badge">overlaps per-day</span>';
+}
+
+function renderStorage(){
+  const u = Store.usage();
+
+  // No persistence available at all — say so instead of showing a fake gauge.
+  if (!u.persistent){
+    $("#stBar").style.display = "none";
+    const el = $("#stTxt");
+    el.innerHTML = '<span class="badge err">NOT PERSISTING — in-memory only</span>';
+    el.title = "localStorage is unavailable: " + LSTORE.reason;
+    return;
+  }
+
+  const pct = Math.min(100, (u.bytes / u.budget) * 100);
+  const bar = $("#stBar");
+  bar.className = "bar" + (pct > 90 ? " bad" : pct > 70 ? " warn" : "");
+  bar.firstElementChild.style.width = pct.toFixed(1) + "%";
+  const nSnaps = Object.keys(Store.snaps).length;
+  const pctTxt = pct < 1 && pct > 0 ? pct.toFixed(1) : pct.toFixed(0);
+  $("#stTxt").textContent = fmtBytes(u.bytes) + " (" + pctTxt + "% of ~5 MB) · " + nSnaps + " snapshot" + (nSnaps === 1 ? "" : "s");
+  if (pct > 90) toast("localStorage is over 90% full. Export to JSON and clear older snapshots before the next import.", "warn", 12000);
+}
+
+/* ---------- summary cards ---------- */
+function renderCards(){
+  const ovIds = new Set(Analyze.overlaps.map(r => r["Issue ID"]));
+  const dpIds = new Set(Analyze.disputes.map(r => r["Issue ID"]));
+
+  let ovExp = 0, dpExp = 0, dpDaily = 0;
+  Analyze.latest.forEach(r => {
+    if (r["Issue Type"] === T_OVERLAP) ovExp += Analyze.expOverlap(r);
+    else { dpExp += Analyze.expDisputeLifetime(r); dpDaily += Analyze.expDisputeDaily(r); }
+  });
+
+  const rec = recurrenceCounts();
+  const heldOpen = Array.from(Analyze.byIssue.values()).filter(h => h.dates.length > 1);
+
+  const cards = [
+    {k:"Issues tracked", v: fmtInt(Analyze.latest.size),
+     s: fmtInt(ovIds.size) + " overlap · " + fmtInt(dpIds.size) + " dispute"},
+    {k:"History", v: Analyze.weeks.length + " wk",
+     s: Analyze.dates.length + " snapshot" + (Analyze.dates.length === 1 ? "" : "s") +
+        (Analyze.dates.length ? " · " + shortDate(Analyze.dates[0]) + " → " + shortDate(Analyze.dates[Analyze.dates.length-1]) : "")},
+    {k:"Overlap exposure", v: fmtMoneyShort(ovExp), money:true,
+     s: (Store.settings.annualizeOverlap ? "annualised · " : "per day · ") + fmtInt(Analyze.overlapClaimedTotal || 0) + " claimed videos"},
+    {k:"Dispute exposure", v: fmtMoneyShort(dpExp), money:true,
+     s: "realised · " + fmtMoneyShort(dpDaily) + "/day ongoing bleed"},
+    {k:"Recurring entities", v: fmtInt(rec.total),
+     s: "3+ weeks & 2+ distinct issues"},
+    {k:"Held open", v: fmtInt(heldOpen.length),
+     s: "same Issue ID across 2+ snapshots"}
+  ];
+
+  $("#cards").innerHTML = cards.map(c =>
+    '<div class="card"><div class="k">' + esc(c.k) + '</div>' +
+    '<div class="v' + (c.money ? " money" : "") + '">' + esc(c.v) + '</div>' +
+    '<div class="s">' + esc(c.s) + '</div></div>'
+  ).join("");
+}
+
+/** Per-dimension count of entities recurring 3+ weeks with 2+ distinct issues. */
+function recurrenceCounts(){
+  const dims = allDimensions();
+  let total = 0;
+  const per = dims.map(d => {
+    const n = d.groups.filter(g => g.weekCount >= 3 && g.issueCount >= 2).length;
+    total += n;
+    const exp = d.groups.filter(g => g.weekCount >= 3 && g.issueCount >= 2)
+                        .reduce((a, g) => a + g.exposure, 0);
+    return {name: d.name, type: d.type, n, exp, groups: d.groups.length};
+  });
+  return {total, per};
+}
+
+/**
+ * Every recurrence dimension in the app, built once per render.
+ * Cached on Analyze so cards / overview / views all agree.
+ */
+let DIM_CACHE = null, DIM_STAMP = "";
+function allDimensions(){
+  const stamp = Analyze.all.length + "|" + Store.settings.rpm + "|" + Store.settings.annualizeOverlap +
+                "|" + JSON.stringify(Store.owners).length + "|" + Analyze.dates.join(",");
+  if (DIM_CACHE && DIM_STAMP === stamp) return DIM_CACHE;
+
+  const A = Analyze, ov = A.overlaps, dp = A.disputes;
+  let claimedTotal = 0;
+  A.latest.forEach(r => { if (r["Issue Type"] === T_OVERLAP) claimedTotal += num(r["Claimed Videos Affected"]); });
+  A.overlapClaimedTotal = claimedTotal;
+
+  const dims = [
+    /* ---- REFERENCE OVERLAPS ---- */
+    {id:"ov-pair", type:"overlap", name:"Asset ⇄ Overlapping Asset pair",
+     entity:"Asset pair (direction-insensitive)",
+     groups: A.recurrence(ov, pairKey, (r, k) => ({
+       label: firstNonEmpty(r["Asset Name"], r["Asset ID"]) + "  ⇄  " + firstNonEmpty(r["Overlapping Asset Name"], r["Overlapping Asset ID"]),
+       sub: k
+     }))},
+    {id:"ov-isrc", type:"overlap", name:"ISRC", entity:"ISRC",
+     groups: A.recurrence(ov, isrcKeys, (r, k) => ({label: k, sub: firstNonEmpty(r["Asset Name"], r["Asset ID"])}))},
+    {id:"ov-upc", type:"overlap", name:"UPC", entity:"UPC",
+     groups: A.recurrence(ov, r => (r["UPC"] || "").trim() || null,
+       (r, k) => ({label: k, sub: firstNonEmpty(r["Labels"], r["Asset Name"])}))},
+    {id:"ov-custom", type:"overlap", name:"Custom ID", entity:"Custom ID",
+     groups: A.recurrence(ov, r => (r["Custom ID"] || "").trim() || null,
+       (r, k) => ({label: k, sub: firstNonEmpty(r["Asset Name"], r["Asset ID"])}))},
+    {id:"ov-party", type:"overlap", name:"Other Party", entity:"Counterparty",
+     groups: A.recurrence(ov, r => (r["Other Party"] || "").trim() || null, (r, k) => ({label: k, sub: ""}))},
+
+    /* ---- DISPUTED CLAIMS ---- */
+    {id:"dp-asset", type:"dispute", name:"Asset ID", entity:"Asset",
+     groups: A.recurrence(dp, r => (r["Asset ID"] || "").trim() || null,
+       (r, k) => ({label: firstNonEmpty(r["Asset Name"], k), sub: k + (r["ISRC"] ? "  ·  " + r["ISRC"] : "")}))},
+    {id:"dp-isrc", type:"dispute", name:"ISRC", entity:"ISRC",
+     groups: A.recurrence(dp, isrcKeys, (r, k) => ({label: k, sub: firstNonEmpty(r["Asset Name"], r["Asset ID"])}))},
+    {id:"dp-channel", type:"dispute", name:"Channel", entity:"Channel (grouped on Channel ID)",
+     groups: A.recurrence(dp, r => (r["Channel ID"] || "").trim() || null, (r, k) => {
+       const o = Analyze.ownerOf(r);
+       return {label: firstNonEmpty(r["Channel Name"], k), sub: k + (o.mapped ? "  ·  owner: " + o.name : "  ·  owner unmapped")};
+     })},
+    {id:"dp-party", type:"dispute", name:"Other Party", entity:"Counterparty",
+     groups: A.recurrence(dp, r => (r["Other Party"] || "").trim() || null, (r, k) => ({label: k, sub: ""}))},
+    {id:"dp-chan-asset", type:"dispute", name:"Channel × Asset pair", entity:"Channel × Asset",
+     groups: A.recurrence(dp, r => {
+       const c = (r["Channel ID"] || "").trim(), a = (r["Asset ID"] || "").trim();
+       return (c && a) ? c + "‖" + a : null;
+     }, (r, k) => ({
+       label: firstNonEmpty(r["Channel Name"], r["Channel ID"]) + "  ×  " + firstNonEmpty(r["Asset Name"], r["Asset ID"]),
+       sub: k.replace("‖", "  ×  ")
+     }))},
+    {id:"dp-owner", type:"dispute", name:"Channel owner roll-up", entity:"Owner (mapped, else Channel Name)",
+     groups: A.recurrence(dp, r => Analyze.ownerOf(r).name || null, (r, k) => {
+       const o = Analyze.ownerOf(r);
+       return {label: k, sub: o.mapped ? "mapped owner" : "unmapped — falling back to Channel Name"};
+     })}
+  ];
+
+  DIM_CACHE = dims; DIM_STAMP = stamp;
+  return dims;
+}
+function dim(id){ return allDimensions().find(d => d.id === id); }
+
+/* ---------- OVERVIEW ---------- */
+function renderOverview(){
+  const A = Analyze;
+  let h = "";
+
+  if (!A.all.length){
+    $("#v-overview").innerHTML =
+      '<section class="panel"><div class="empty">' +
+      'No snapshots stored yet.<br><br>Drop one or more <code>LE_dispute_export_M-D.csv</code> / ' +
+      '<code>LE_ref_export_M-D.csv</code> files above to start the ledger.</div></section>';
+    return;
+  }
+
+  /* --- escalation summary: where the recurrence actually is --- */
+  const rec = recurrenceCounts();
+  h += '<section class="panel"><h2>Escalation signal <span class="sub">entities generating DIFFERENT issue IDs across 3+ weeks (structural problems, not a backlog)</span></h2>';
+  h += '<div class="scroll"><table><thead><tr><th>Grouping</th><th>Type</th><th class="num">recurring 3+ wks</th>' +
+       '<th class="num">exposure of those</th><th class="num">total groups</th><th>jump to</th></tr></thead><tbody>';
+  rec.per.forEach(p => {
+    const d = allDimensions().find(x => x.name === p.name && x.type === p.type);
+    h += '<tr><td>' + esc(p.name) + '</td>' +
+         '<td>' + (p.type === "overlap" ? '<span class="badge ov">overlap</span>' : '<span class="badge dp">dispute</span>') + '</td>' +
+         '<td class="num' + (p.n ? ' hot3' : '') + '">' + fmtInt(p.n) + '</td>' +
+         '<td class="money">' + fmtMoney(p.exp) + '</td>' +
+         '<td class="num dim">' + fmtInt(p.groups) + '</td>' +
+         '<td><a href="#" data-act="goto" data-tab="' + (p.type === "overlap" ? "overlaps" : "disputes") +
+             '" data-target="t-' + esc(d ? d.id : "") + '">view →</a></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="body" style="padding-top:8px"><p class="note">Counts are per grouping and overlap each other by design — one bad delivery can surface as an asset pair, a UPC and an ISRC at once. Read them as "how many distinct structural problems does this lens show", not as a sum.</p></div></section>';
+
+  /* --- time series --- */
+  const ovS = A.series(T_OVERLAP), dpS = A.series(T_DISPUTE);
+  h += '<section class="panel"><h2>Trend by snapshot <span class="sub">is the problem growing?</span></h2><div class="body"><div class="charts">';
+  h += lineChart(ovS.map(p => ({label:p.date, value:p.issues})),   {title:"Reference overlaps — open issues", color:"#4a9eff"});
+  h += lineChart(ovS.map(p => ({label:p.date, value:p.scale})),    {title:"Reference overlaps — claimed videos affected", sub:"scale metric for overlaps", color:"#6fb1ff"});
+  h += lineChart(ovS.map(p => ({label:p.date, value:p.exposure})), {title:"Reference overlaps — exposure", sub:Store.settings.annualizeOverlap ? "annualised" : "per day", color:"#5fd39b", fmt:fmtMoneyShort});
+  h += lineChart(dpS.map(p => ({label:p.date, value:p.issues})),   {title:"Disputed claims — open issues", color:"#c08cf0"});
+  h += lineChart(dpS.map(p => ({label:p.date, value:p.scale})),    {title:"Disputed claims — engaged views lifetime", sub:"scale metric for disputes", color:"#d3a6f7"});
+  h += lineChart(dpS.map(p => ({label:p.date, value:p.exposure})), {title:"Disputed claims — realised exposure", sub:"lifetime views × RPM", color:"#5fd39b", fmt:fmtMoneyShort});
+  h += '</div><p class="note">' + RPM_NOTE() + '</p></div></section>';
+
+  /* --- held open (type A) --- */
+  const held = Array.from(A.byIssue.values()).filter(x => x.dates.length > 1).map(x => ({
+    key: x.id, id: x.id, type: x.type, dates: x.dates, daysHeld: x.daysHeld,
+    snaps: x.dates.length, first: x.first, last: x.last,
+    entity: x.row ? (x.type === T_OVERLAP
+        ? firstNonEmpty(x.row["Asset Name"], x.row["Asset ID"]) + " ⇄ " + firstNonEmpty(x.row["Overlapping Asset Name"], x.row["Overlapping Asset ID"])
+        : firstNonEmpty(x.row["Asset Name"], x.row["Asset ID"]) + " × " + firstNonEmpty(x.row["Channel Name"], x.row["Channel ID"])) : "",
+    party: x.row ? (x.row["Other Party"] || "") : "",
+    exposure: x.row ? A.exposure(x.row) : 0,
+    link: x.row ? (x.row["Link To Issue"] || "") : "",
+    statusDetail: x.row ? (x.row["Status Detail"] || "") : ""
+  }));
+
+  h += regTable({
+    id: "t-held",
+    title: "Held open — same Issue ID across multiple snapshots",
+    sub: "recurrence type A: one issue you are deliberately holding open, NOT a structural problem",
+    note: 'Days held = last snapshot date − first snapshot date for that Issue ID. This table never mixes with the type-B recurrence tables: a single long-running issue is a decision, not a pattern.',
+    cols: [
+      {key:"id", label:"Issue ID", type:"str", cls:"id"},
+      {key:"type", label:"type", type:"str",
+       fmt: r => r.type === T_OVERLAP ? '<span class="badge ov">overlap</span>' : '<span class="badge dp">dispute</span>'},
+      {key:"entity", label:"entity", type:"str", cls:"wide"},
+      {key:"party", label:"other party", type:"str", cls:"wide"},
+      {key:"snaps", label:"snaps", type:"num"},
+      {key:"first", label:"first seen", type:"str", cls:"dim"},
+      {key:"last", label:"last seen", type:"str"},
+      {key:"daysHeld", label:"days held", type:"num",
+       fmt: r => (r.daysHeld >= 21 ? '<span class="hot3">' : r.daysHeld >= 14 ? '<span class="hot2">' : '<span>') + fmtInt(r.daysHeld) + '</span>'},
+      {key:"statusDetail", label:"status detail", type:"str", cls:"dim"},
+      {key:"exposure", label:"exposure", type:"num", cls:"money", fmt: r => fmtMoney(r.exposure)},
+      {key:"link", label:"link", type:"str",
+       fmt: r => /^https?:\/\//i.test(r.link) ? '<a href="' + esc(r.link) + '" target="_blank" rel="noopener noreferrer">open ↗</a>' : '<span class="dim">—</span>'}
+    ],
+    rows: held, sort:"daysHeld", dir:"desc"
+  });
+
+  /* --- snapshot inventory --- */
+  const inv = Object.keys(Store.snaps).map(k => {
+    const s = Store.snaps[k];
+    return {key:k, date:s.date, type:s.issueType, rows:(s.rows || []).length,
+            files:(s.files || []).join(", "), importedAt:s.importedAt || ""};
+  });
+  h += regTable({
+    id: "t-inv",
+    title: "Snapshot inventory",
+    sub: "one row per snapshot date + issue type",
+    note: "Deleting a snapshot removes it from every table and chart. Export to JSON first if you may want it back.",
+    cols: [
+      {key:"date", label:"snapshot date", type:"str"},
+      {key:"type", label:"issue type", type:"str",
+       fmt: r => r.type === T_OVERLAP ? '<span class="badge ov">overlap</span>' : '<span class="badge dp">dispute</span>'},
+      {key:"rows", label:"rows", type:"num"},
+      {key:"files", label:"source file(s)", type:"str", cls:"wide dim"},
+      {key:"importedAt", label:"imported", type:"str", cls:"dim",
+       fmt: r => esc((r.importedAt || "").replace("T", " ").slice(0, 16))},
+      {key:"del", label:"", type:"str",
+       fmt: r => '<button class="sm danger" data-act="del-snap" data-key="' + esc(r.key) + '">delete</button>'}
+    ],
+    rows: inv, sort:"date", dir:"desc", tsv:false
+  });
+
+  /* --- status / status detail, low prominence --- */
+  const st = {}, sd = {};
+  A.latest.forEach(r => {
+    const a = r["Status"] || "(blank)";
+    const b = (r["Status Detail"] || "").trim() || "(blank)";
+    st[a] = (st[a] || 0) + 1;
+    const kk = r["Issue Type"] + " — " + b;
+    sd[kk] = (sd[kk] || 0) + 1;
+  });
+  h += '<section class="panel"><h2>Status <span class="sub">low signal: the export only contains open issues</span></h2><div class="body">' +
+       '<div style="display:flex;gap:26px;flex-wrap:wrap;font-size:11.5px">' +
+       '<div><div style="color:#8b97a7;margin-bottom:3px">Status</div>' +
+       Object.keys(st).sort().map(k => '<div>' + esc(k) + ' <b>' + fmtInt(st[k]) + '</b></div>').join("") + '</div>' +
+       '<div><div style="color:#8b97a7;margin-bottom:3px">Status Detail (the one with variation)</div>' +
+       Object.keys(sd).sort().map(k => '<div>' + esc(k) + ' <b>' + fmtInt(sd[k]) + '</b></div>').join("") + '</div>' +
+       '</div></div></section>';
+
+  $("#v-overview").innerHTML = h;
+}
+
+/* ---------- REFERENCE OVERLAPS ---------- */
+function renderOverlaps(){
+  const A = Analyze;
+  if (!A.overlaps.length){
+    $("#v-overlaps").innerHTML = '<section class="panel"><div class="empty">No reference-overlap snapshots imported yet.</div></section>';
+    return;
+  }
+
+  let totalExp = 0, claimed = 0, daily = 0;
+  const ids = new Set();
+  A.latest.forEach(r => {
+    if (r["Issue Type"] !== T_OVERLAP) return;
+    ids.add(r["Issue ID"]);
+    totalExp += A.expOverlap(r);
+    claimed += num(r["Claimed Videos Affected"]);
+    daily += num(r["Engaged Views Affected Daily"]);
+  });
+
+  let h = '<section class="panel"><h2>Reference overlaps <span class="sub">asset vs asset — no channel or lifetime-view metrics exist on these rows</span></h2>' +
+    '<div class="body" style="display:flex;gap:26px;flex-wrap:wrap;font-size:12px">' +
+    '<div><div class="k" style="color:#5f6b7a;font-size:10.5px">DISTINCT ISSUES</div><b style="font-size:16px">' + fmtInt(ids.size) + '</b></div>' +
+    '<div><div class="k" style="color:#5f6b7a;font-size:10.5px">CLAIMED VIDEOS AFFECTED</div><b style="font-size:16px">' + fmtInt(claimed) + '</b></div>' +
+    '<div><div class="k" style="color:#5f6b7a;font-size:10.5px">ENGAGED VIEWS AFFECTED DAILY</div><b style="font-size:16px">' + fmtInt(daily) + '</b></div>' +
+    '<div><div class="k" style="color:#5f6b7a;font-size:10.5px">EXPOSURE</div><b style="font-size:16px;color:var(--money)">' + fmtMoney(totalExp) + '</b></div>' +
+    '</div><div class="body" style="padding-top:0"><p class="note">' + OV_FORMULA() + '</p></div></section>';
+
+  const pair = dim("ov-pair");
+  h += recurrenceSpec("t-ov-pair",
+    "1. Recurring asset ⇄ asset pairs",
+    "the most important table here — the same two assets colliding week after week means the REFERENCE is wrong, not the claim",
+    'Pairs are direction-insensitive: A→B and B→A are the same collision and are grouped together. ' + OV_FORMULA(),
+    pair.groups, "overlap", "Asset pair");
+
+  const isrc = dim("ov-isrc");
+  h += recurrenceSpec("t-ov-isrc", "2. Recurring ISRC", "one recording repeatedly colliding",
+    'Multi-value ISRC cells are split on "|" and each ISRC is grouped separately, so a row with two ISRCs contributes to both groups — do not add ISRC exposure to pair exposure. ' + OV_FORMULA(),
+    isrc.groups, "overlap", "ISRC");
+
+  const upc = dim("ov-upc");
+  h += recurrenceSpec("t-ov-upc", "3. Recurring UPC", "a recurring UPC implies a whole release was delivered wrong",
+    'If a UPC shows several distinct asset pairs across several weeks, treat the release — not the individual issues — as the unit of work. ' + OV_FORMULA(),
+    upc.groups, "overlap", "UPC");
+
+  const cust = dim("ov-custom");
+  h += recurrenceSpec("t-ov-custom", "4. Recurring Custom ID", "your own identifier — usually maps to a delivery batch",
+    OV_FORMULA(), cust.groups, "overlap", "Custom ID");
+
+  const party = dim("ov-party");
+  h += recurrenceSpec("t-ov-party", "5. Counterparty concentration", "one party generating many overlaps is a single conversation, not N resolutions",
+    'Sort by issues to find the party worth a call; sort by exposure to find the party worth escalating. ' + OV_FORMULA(),
+    party.groups, "overlap", "Other Party");
+
+  $("#v-overlaps").innerHTML = h;
+}
+
+/* ---------- DISPUTES ---------- */
+function renderDisputes(){
+  const A = Analyze;
+  if (!A.disputes.length){
+    $("#v-disputes").innerHTML = '<section class="panel"><div class="empty">No disputed-claim snapshots imported yet.</div></section>';
+    return;
+  }
+
+  let exp = 0, dailyExp = 0, life = 0, daily = 0, unmapped = 0;
+  const ids = new Set(), chans = new Set(), unmappedChans = new Set();
+  A.latest.forEach(r => {
+    if (r["Issue Type"] !== T_DISPUTE) return;
+    ids.add(r["Issue ID"]);
+    exp += A.expDisputeLifetime(r);
+    dailyExp += A.expDisputeDaily(r);
+    life += num(r["Engaged Views Lifetime"]);
+    daily += num(r["Engaged Views Affected Daily"]);
+    const cid = r["Channel ID"] || "";
+    if (cid){ chans.add(cid); if (!Store.owners[cid]) { unmappedChans.add(cid); unmapped++; } }
+  });
+
+  let h = '<section class="panel"><h2>Disputed claims <span class="sub">claim-level; Claimed Videos Affected is ~always 1, so lifetime views is the scale metric</span></h2>' +
+    '<div class="body" style="display:flex;gap:26px;flex-wrap:wrap;font-size:12px">' +
+    '<div><div style="color:#5f6b7a;font-size:10.5px">DISTINCT ISSUES</div><b style="font-size:16px">' + fmtInt(ids.size) + '</b></div>' +
+    '<div><div style="color:#5f6b7a;font-size:10.5px">ENGAGED VIEWS LIFETIME</div><b style="font-size:16px">' + fmtInt(life) + '</b></div>' +
+    '<div><div style="color:#5f6b7a;font-size:10.5px">ENGAGED VIEWS DAILY</div><b style="font-size:16px">' + fmtInt(daily) + '</b></div>' +
+    '<div><div style="color:#5f6b7a;font-size:10.5px">REALISED EXPOSURE</div><b style="font-size:16px;color:var(--money)">' + fmtMoney(exp) + '</b></div>' +
+    '<div><div style="color:#5f6b7a;font-size:10.5px">DAILY BLEED</div><b style="font-size:16px;color:var(--money)">' + fmtMoney(dailyExp) + '</b></div>' +
+    '<div><div style="color:#5f6b7a;font-size:10.5px">CHANNELS</div><b style="font-size:16px">' + fmtInt(chans.size) + '</b>' +
+      '<span class="dim" style="font-size:10.5px"> · ' + fmtInt(unmappedChans.size) + ' unmapped</span></div>' +
+    '</div><div class="body" style="padding-top:0"><p class="note">' + DP_FORMULA() + '</p></div></section>';
+
+  h += recurrenceSpec("t-dp-asset", "1. Recurring asset", "the same asset disputed repeatedly by anyone",
+    DP_FORMULA(), dim("dp-asset").groups, "dispute", "Asset");
+
+  h += recurrenceSpec("t-dp-isrc", "2. Recurring ISRC", "recording-level view of the same problem",
+    'Multi-value ISRC cells are split on "|"; a row with two ISRCs contributes to both groups. ' + DP_FORMULA(),
+    dim("dp-isrc").groups, "dispute", "ISRC");
+
+  h += recurrenceSpec("t-dp-channel", "3. Recurring channel", "grouped on Channel ID, displayed by Channel Name (names change, IDs do not)",
+    'Map Channel IDs to owners in Settings to unlock the owner roll-up below. ' + DP_FORMULA(),
+    dim("dp-channel").groups, "dispute", "Channel");
+
+  h += recurrenceSpec("t-dp-owner", "4. Channel owner roll-up", "mapped owner, falling back to Channel Name where unmapped",
+    'Unmapped channels appear under their Channel Name, so a single owner operating five unmapped channels still looks like five entities — fill in the mapping table in Settings to collapse them. ' + DP_FORMULA(),
+    dim("dp-owner").groups, "dispute", "Owner");
+
+  h += recurrenceSpec("t-dp-party", "5. Counterparty concentration", "one party disputing across your catalogue",
+    DP_FORMULA(), dim("dp-party").groups, "dispute", "Other Party");
+
+  h += recurrenceSpec("t-dp-chan-asset", "6. Channel × Asset pairs", "a channel repeatedly disputing the SAME asset is a different problem from one disputing 40 different assets",
+    'Read this next to table 3: high issue count here on ONE pair means a stuck, repeatedly-refiled dispute; a channel with many rows here but low counts each is a broad claimer. ' + DP_FORMULA(),
+    dim("dp-chan-asset").groups, "dispute", "Channel × Asset");
+
+  $("#v-disputes").innerHTML = h;
+}
+
+/* ---------- SETTINGS ---------- */
+function renderSettings(){
+  const s = Store.settings;
+  const u = Store.usage();
+  let h = "";
+
+  /* revenue assumptions */
+  h += '<section class="panel"><h2>Revenue assumptions</h2><div class="body">' +
+    '<div class="fgrid">' +
+      '<label for="setRpm">RPM (revenue per 1,000 views)</label>' +
+      '<div class="btnrow"><input type="number" id="setRpm" step="0.01" min="0" value="' + esc(s.rpm) + '" style="width:110px">' +
+        '<span class="note" style="margin:0">Applied to every dollar figure in the app. Default ' + fmtMoney(DEFAULT_SETTINGS.rpm) + ' is deliberately conservative.</span></div>' +
+      '<label for="setAnn">Annualise overlap exposure</label>' +
+      '<div class="btnrow"><input type="checkbox" id="setAnn"' + (s.annualizeOverlap ? " checked" : "") + '>' +
+        '<span class="note" style="margin:0">Multiplies the per-day overlap figure by 365. Off = per-day.</span></div>' +
+    '</div>' +
+    '<p class="note warn" style="margin-top:10px">Formulas, verbatim:<br>' +
+      '&nbsp;· Dispute realised exposure = <code>Engaged Views Lifetime × RPM ÷ 1000</code><br>' +
+      '&nbsp;· Dispute daily bleed = <code>Engaged Views Affected Daily × RPM ÷ 1000</code><br>' +
+      '&nbsp;· Overlap exposure = <code>Engaged Views Affected Daily × Claimed Videos Affected × RPM ÷ 1000</code>' + (s.annualizeOverlap ? ' <code>× 365</code>' : '') + '<br>' +
+      'Call these <b>exposure</b> or <b>revenue at risk</b> — never lost revenue. On an overlap the money is typically held or split pending resolution.</p>' +
+    '<p class="note">One caveat worth knowing before you put the overlap number in a deck: if your CMS export already reports <i>Engaged Views Affected Daily</i> across all claimed videos rather than per video, the × Claimed Videos Affected term double-counts. The raw daily-views and claimed-videos columns sit beside every dollar figure precisely so this is checkable — sanity-check one issue against CMS before escalating.</p>' +
+    '</div></section>';
+
+  /* channel owner mapping */
+  const chanRows = [];
+  const seen = new Map();
+  Analyze.disputes.forEach(r => {
+    const cid = (r["Channel ID"] || "").trim();
+    if (!cid) return;
+    let e = seen.get(cid);
+    if (!e){ e = {key:cid, cid, name:r["Channel Name"] || "", issues:new Set(), exposure:0}; seen.set(cid, e); }
+    if (r["Channel Name"]) e.name = r["Channel Name"];
+    e.issues.add(r["Issue ID"]);
+  });
+  seen.forEach(e => {
+    let exp = 0;
+    e.issues.forEach(id => { const r = Analyze.latest.get(id); if (r) exp += Analyze.expDisputeLifetime(r); });
+    e.exposure = exp;
+    e.issueCount = e.issues.size;
+    e.owner = Store.owners[e.cid] || "";
+    chanRows.push(e);
+  });
+  // owner entries that no longer appear in any snapshot are kept and shown too
+  Object.keys(Store.owners).forEach(cid => {
+    if (!seen.has(cid)) chanRows.push({key:cid, cid, name:"(not in current snapshots)", issueCount:0, exposure:0, owner:Store.owners[cid]});
+  });
+
+  h += regTable({
+    id:"t-owners",
+    title:"Channel → owner mapping",
+    sub:"disputes only · the export has no owner column, so this is yours to maintain · saved to localStorage and included in JSON export",
+    note:'Type an owner name and it saves on blur. Blank the field to remove the mapping. Unmapped channels fall back to Channel Name in the roll-up. Channel names change over time; the mapping is keyed on the stable Channel ID.',
+    cols:[
+      {key:"name", label:"channel name", type:"str", cls:"wide"},
+      {key:"cid", label:"channel id", type:"str", cls:"id"},
+      {key:"issueCount", label:"issues", type:"num"},
+      {key:"exposure", label:"exposure", type:"num", cls:"money", fmt:r => fmtMoney(r.exposure)},
+      {key:"owner", label:"owner name", type:"str",
+       fmt:r => '<input type="text" data-act="owner" data-cid="' + esc(r.cid) + '" value="' + esc(r.owner) + '" placeholder="unmapped" style="width:190px">'}
+    ],
+    rows: chanRows, sort:"exposure", dir:"desc", tsv:true
+  });
+
+  h += '<section class="panel"><h2>Add a channel mapping manually</h2><div class="body"><div class="btnrow">' +
+    '<input type="text" id="newCid" placeholder="Channel ID (UC…)" style="width:240px">' +
+    '<input type="text" id="newOwner" placeholder="Owner name" style="width:200px">' +
+    '<button id="addOwner">add mapping</button></div>' +
+    '<p class="note">Useful for pre-loading owners before their channels show up in an export.</p></div></section>';
+
+  /* data management */
+  h += '<section class="panel"><h2>Data</h2><div class="body">' +
+    '<div class="btnrow">' +
+      '<button class="primary" id="btnExport">Export all data (JSON)</button>' +
+      '<button id="btnImportJson">Import data (JSON)</button>' +
+      '<input type="file" id="jsonInput" accept=".json,application/json" hidden>' +
+      '<button class="danger" id="btnClear">Clear all data…</button>' +
+      '<span id="clearConfirm"></span>' +
+    '</div>' +
+    '<div class="hr"></div>' +
+    (!u.persistent
+      ? '<p class="note warn"><b>localStorage is unavailable in this context</b> (' + esc(LSTORE.reason) + ').<br>' +
+        'The app is running on an in-memory fallback: everything works, but <b>nothing survives a reload</b>. ' +
+        'Export to JSON before you close the tab. This happens on <code>file://</code> or <code>data:</code> URLs and when site data is blocked — ' +
+        'serve the page over http(s) (GitHub Pages is fine) and persistence returns.</p>'
+      : '') +
+    '<div class="note">Storage: <b>' + fmtBytes(u.bytes) + '</b> of a ~5 MB localStorage budget (' +
+      ((u.bytes / u.budget) * 100).toFixed(1) + '%) across ' + Object.keys(Store.snaps).length + ' snapshots, ' +
+      fmtInt(Analyze.all.length) + ' stored rows and ' + Object.keys(Store.owners).length + ' owner mappings.<br>' +
+      'Rows are stored positionally against a per-snapshot column list, which is roughly 3× smaller than storing objects. ' +
+      'If a write ever fails you get a red error, not a silent loss — the in-memory state is rolled back so what is on screen still matches what is stored.</div>' +
+    '<p class="note warn">Everything is local. No fetch, no XHR, no analytics, no CDN — the page makes zero network requests, which you can confirm in the Network tab. ' +
+      'Never commit an export CSV or the JSON backup to the repo: <code>.gitignore</code> covers <code>*.csv</code> and <code>*.json</code> at the project root, but check <code>git status</code> before committing anyway.</p>' +
+    '</div></section>';
+
+  /* schema transparency */
+  h += '<section class="panel"><h2>Schema handling</h2><div class="body">' +
+    '<div class="note">Parsed and retained on every raw record, but deliberately excluded from all metrics: ' +
+      IGNORED_COLS.map(c => '<code>' + esc(c) + '</code>').join(" ") + '.</div>' +
+    '<div class="note" style="margin-top:6px">Quirks handled explicitly: overlap rows carry no Video / Channel / Claim / Match Type / lifetime-views data (never shown in overlap views); ' +
+      'overlap scale comes from <code>Claimed Videos Affected</code>; dispute scale comes from <code>Engaged Views Lifetime</code>; ' +
+      '<code>ISRC</code> is split on <code>|</code>; quoted fields containing commas are handled by a full RFC4180 parser; ' +
+      'rows are deduped on Issue ID + snapshot date.</div>' +
+    '</div></section>';
+
+  $("#v-settings").innerHTML = h;
+}
+
+
+/* ==========================================================================
+   8. IMPORT — staging then commit
+   ========================================================================== */
+let STAGE = [];          // [{id, filename, iso, issueType, records, cols, warn[], dupOf, action}]
+let STAGE_SEQ = 0;
+
+/** Read a File as text (FileReader only — no network). */
+function readFile(file){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result || ""));
+    fr.onerror = () => rej(fr.error || new Error("read failed"));
+    fr.readAsText(file);
+  });
+}
+
+async function stageFiles(fileList){
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+
+  for (const f of files){
+    if (!/\.csv$/i.test(f.name) && f.type && !/csv|text/i.test(f.type)){
+      toast("Skipped <b>" + esc(f.name) + "</b> — not a CSV.", "warn");
+      continue;
+    }
+    let text;
+    try { text = await readFile(f); }
+    catch(e){ toast("Could not read <b>" + esc(f.name) + "</b>: " + esc(e.message), "err"); continue; }
+
+    const raw = parseCSV(text);
+    if (raw.length < 2){ toast("<b>" + esc(f.name) + "</b> has no data rows.", "err"); continue; }
+
+    const nz = normalizeCSV(raw);
+    const meta = dateFromFilename(f.name);
+
+    // split by Issue Type — one file could in principle carry both
+    const byType = new Map();
+    const tIdx = nz.cols.indexOf("Issue Type");
+    for (const rec of nz.records){
+      let t = (rec[tIdx] || "").trim();
+      if (!t) t = meta.typeHint || "(unknown)";
+      // tolerate casing / wording drift
+      if (/overlap/i.test(t)) t = T_OVERLAP;
+      else if (/disput/i.test(t)) t = T_DISPUTE;
+      if (!byType.has(t)) byType.set(t, []);
+      byType.get(t).push(rec);
+    }
+
+    for (const [type, records] of byType){
+      const warn = [];
+      if (meta.guessed) warn.push("no M-D in filename — defaulted to today, please set the date");
+      if (nz.missing.length) warn.push("missing column(s): " + nz.missing.slice(0, 6).join(", ") + (nz.missing.length > 6 ? " +" + (nz.missing.length - 6) : ""));
+      if (nz.unknown.length) warn.push("extra column(s) kept as-is: " + nz.unknown.slice(0, 4).join(", "));
+      if (type === "(unknown)") warn.push("Issue Type column was blank and the filename did not say — pick the type");
+      if (meta.typeHint && type !== "(unknown)" && meta.typeHint !== type) warn.push("filename says " + meta.typeHint.toLowerCase() + " but rows say " + type.toLowerCase());
+      STAGE.push({
+        id: "stg" + (++STAGE_SEQ),
+        filename: f.name,
+        iso: meta.iso,
+        issueType: type,
+        cols: nz.cols,
+        records,
+        warn,
+        action: "replace"
+      });
+    }
+  }
+  renderStage();
+}
+
+function renderStage(){
+  const wrap = $("#stageWrap");
+  if (!STAGE.length){ wrap.innerHTML = ""; return; }
+
+  // compute duplicates against store + against earlier pending entries
+  const pending = new Map();
+  STAGE.forEach(s => {
+    const k = Store.key(s.iso, s.issueType);
+    s.dupStore = !!Store.snaps[k];
+    s.dupStoreRows = s.dupStore ? (Store.snaps[k].rows || []).length : 0;
+    s.dupPending = pending.has(k) ? pending.get(k) : null;
+    pending.set(k, s.id);
+  });
+
+  let h = '<div class="hr"></div><div style="font-size:12px;margin-bottom:6px;color:#b9c5d4">' +
+    '<b>' + STAGE.length + '</b> snapshot' + (STAGE.length === 1 ? "" : "s") + ' staged — check the dates, then commit.</div>';
+  h += '<div class="scroll" style="max-height:340px"><table class="stage-tbl"><thead><tr>' +
+    '<th class="na">file</th><th class="na">issue type</th><th class="na">snapshot date</th>' +
+    '<th class="na num">rows</th><th class="na">status</th><th class="na">on duplicate</th><th class="na"></th>' +
+    '</tr></thead><tbody>';
+
+  STAGE.forEach(s => {
+    const dup = s.dupStore || s.dupPending;
+    h += '<tr>';
+    h += '<td class="wide">' + esc(s.filename) + (s.warn.length ? '<br><span style="color:#e8c98a;font-size:10.5px">⚠ ' + esc(s.warn.join(" · ")) + '</span>' : '') + '</td>';
+    h += '<td><select data-act="stage-type" data-id="' + s.id + '">' +
+         [T_OVERLAP, T_DISPUTE, "(unknown)"].map(t =>
+           '<option' + (t === s.issueType ? " selected" : "") + '>' + esc(t) + '</option>').join("") +
+         '</select></td>';
+    h += '<td><input type="date" data-act="stage-date" data-id="' + s.id + '" value="' + esc(s.iso) + '"></td>';
+    h += '<td class="num">' + fmtInt(s.records.length) + '</td>';
+    h += '<td>' + (s.dupStore
+            ? '<span class="badge dup">DUPLICATE — ' + fmtInt(s.dupStoreRows) + ' rows already stored for this date+type</span>'
+            : s.dupPending
+              ? '<span class="badge dup">DUPLICATE of another staged file</span>'
+              : '<span class="badge ok">new</span>') + '</td>';
+    h += '<td>' + (dup
+            ? '<select data-act="stage-action" data-id="' + s.id + '">' +
+              '<option value="replace"' + (s.action === "replace" ? " selected" : "") + '>replace stored snapshot</option>' +
+              '<option value="skip"' + (s.action === "skip" ? " selected" : "") + '>skip this file</option>' +
+              '</select>'
+            : '<span class="dim">—</span>') + '</td>';
+    h += '<td><button class="sm" data-act="stage-drop" data-id="' + s.id + '">remove</button></td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="btnrow" style="margin-top:9px">' +
+       '<button class="primary" id="commitBtn">Commit import</button>' +
+       '<button id="cancelStage">Cancel</button>' +
+       '<span class="note" style="margin:0">Nothing is written to localStorage until you commit.</span></div>';
+  wrap.innerHTML = h;
+}
+
+function commitStage(){
+  const prev = JSON.parse(JSON.stringify(Store.snaps));   // for rollback on quota failure
+  let added = 0, replaced = 0, skipped = 0;
+  const bad = STAGE.filter(s => s.issueType === "(unknown)" || !isoValid(s.iso));
+  if (bad.length){
+    toast("Set a valid issue type and date on every staged file first (" + bad.length + " still incomplete).", "err");
+    return;
+  }
+
+  // later staged entries win over earlier ones for the same key, unless skipped
+  for (const s of STAGE){
+    const k = Store.key(s.iso, s.issueType);
+    const exists = !!Store.snaps[k];
+    if (exists && s.action === "skip"){ skipped++; continue; }
+    const files = exists && Store.snaps[k].files ? Store.snaps[k].files.slice() : [];
+    if (files.indexOf(s.filename) === -1) files.push(s.filename);
+    Store.snaps[k] = {
+      date: s.iso,
+      issueType: s.issueType,
+      files: s.action === "replace" ? [s.filename] : files,
+      importedAt: new Date().toISOString(),
+      cols: s.cols,
+      rows: s.records
+    };
+    exists ? replaced++ : added++;
+  }
+
+  if (!Store.saveSnaps(prev)){ render(); return; }   // rollback already applied
+
+  STAGE = [];
+  renderStage();
+  DIM_CACHE = null;
+  render();
+  toast("Imported: <b>" + added + "</b> new, <b>" + replaced + "</b> replaced, <b>" + skipped + "</b> skipped.", "ok");
+}
+
+
+/* ==========================================================================
+   9. BOOT / EVENT WIRING
+   ========================================================================== */
+
+/* ---- tabs ---- */
+function showTab(name){
+  $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + name));
+}
+$("#tabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-tab]");
+  if (b) showTab(b.dataset.tab);
+});
+
+/* ---- import panel toggle ---- */
+$("#toggleImport").addEventListener("click", e => {
+  const body = $("#importBody");
+  const hidden = body.style.display === "none";
+  body.style.display = hidden ? "" : "none";
+  e.target.textContent = hidden ? "hide" : "show";
+});
+
+/* ---- drag & drop ---- */
+const drop = $("#drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); e.stopPropagation(); drop.classList.add("hot");
+}));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); e.stopPropagation(); drop.classList.remove("hot");
+}));
+drop.addEventListener("drop", e => stageFiles(e.dataTransfer && e.dataTransfer.files));
+// stop the whole window from navigating away when a file misses the drop zone
+["dragover","drop"].forEach(ev => window.addEventListener(ev, e => {
+  if (!drop.contains(e.target)) e.preventDefault();
+}));
+$("#pickBtn").addEventListener("click", () => $("#fileInput").click());
+$("#fileInput").addEventListener("change", e => { stageFiles(e.target.files); e.target.value = ""; });
+
+/* ---- global click delegation (tables, staging, data buttons) ---- */
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-act],[id]");
+  if (!t) return;
+  const act = t.dataset ? t.dataset.act : null;
+
+  /* --- table interactions --- */
+  if (act === "sort"){
+    const st = tableState(t.dataset.id);
+    if (st.sort === t.dataset.col) st.dir = st.dir === "asc" ? "desc" : "asc";
+    else { st.sort = t.dataset.col; st.dir = "desc"; }
+    refreshTable(t.dataset.id);
+    return;
+  }
+  if (act === "toggle"){
+    const st = tableState(t.dataset.id);
+    const k = t.dataset.row;
+    st.open.has(k) ? st.open.delete(k) : st.open.add(k);
+    refreshTable(t.dataset.id);
+    return;
+  }
+  if (act === "expand-all"){
+    const id = t.dataset.id, st = tableState(id);
+    tableRows(id).slice(0, 200).forEach(r => st.open.add(String(r.key)));
+    refreshTable(id);
+    return;
+  }
+  if (act === "collapse-all"){
+    tableState(t.dataset.id).open.clear();
+    refreshTable(t.dataset.id);
+    return;
+  }
+  if (act === "tsv"){
+    copyText(tableTSV(t.dataset.id), "TSV copied");
+    return;
+  }
+  if (act === "goto"){
+    e.preventDefault();
+    showTab(t.dataset.tab);
+    const target = document.querySelector('[data-table="' + t.dataset.target + '"]');
+    if (target) target.scrollIntoView({behavior:"smooth", block:"start"});
+    return;
+  }
+  if (act === "del-snap"){
+    const k = t.dataset.key;
+    if (!confirm("Delete snapshot " + k.replace("|", " · ") + " ?\n\nThis removes it from every table and chart. Export to JSON first if you might want it back.")) return;
+    const prev = JSON.parse(JSON.stringify(Store.snaps));
+    delete Store.snaps[k];
+    if (Store.saveSnaps(prev)) toast("Snapshot deleted.", "ok");
+    DIM_CACHE = null;
+    render();
+    return;
+  }
+
+  /* --- staging --- */
+  if (act === "stage-drop"){
+    STAGE = STAGE.filter(s => s.id !== t.dataset.id);
+    renderStage();
+    return;
+  }
+  if (t.id === "commitBtn"){ commitStage(); return; }
+  if (t.id === "cancelStage"){ STAGE = []; renderStage(); return; }
+
+  /* --- settings: owner mapping --- */
+  if (t.id === "addOwner"){
+    const cid = $("#newCid").value.trim(), own = $("#newOwner").value.trim();
+    if (!cid){ toast("Channel ID required.", "err"); return; }
+    if (!own){ toast("Owner name required.", "err"); return; }
+    Store.owners[cid] = own;
+    if (Store.saveOwners()) toast("Mapping added.", "ok");
+    DIM_CACHE = null;
+    render();
+    showTab("settings");
+    return;
+  }
+
+  /* --- settings: data management --- */
+  if (t.id === "btnExport"){
+    const stamp = new Date().toISOString().slice(0,10);
+    download("cms-issue-ledger-backup-" + stamp + ".json", JSON.stringify(Store.exportBundle(), null, 1));
+    toast("Exported. <b>Do not commit this file</b> — it is company data and the repo is public.", "warn", 12000);
+    return;
+  }
+  if (t.id === "btnImportJson"){ $("#jsonInput").click(); return; }
+  if (t.id === "btnClear"){
+    const box = $("#clearConfirm");
+    box.innerHTML = '<span class="badge err">Delete every snapshot, setting and owner mapping?</span> ' +
+                    '<button class="danger sm" id="btnClearYes">yes, clear everything</button> ' +
+                    '<button class="sm" id="btnClearNo">cancel</button>';
+    return;
+  }
+  if (t.id === "btnClearYes"){
+    Store.clearAll();
+    STAGE = []; DIM_CACHE = null;
+    Object.keys(TSTATE).forEach(k => delete TSTATE[k]);
+    renderStage(); render();
+    toast("All local data cleared.", "ok");
+    return;
+  }
+  if (t.id === "btnClearNo"){ $("#clearConfirm").innerHTML = ""; return; }
+});
+
+/* ---- global input/change delegation ---- */
+document.addEventListener("input", e => {
+  const t = e.target, act = t.dataset ? t.dataset.act : null;
+
+  if (act === "filter"){
+    tableState(t.dataset.id).filter = t.value;
+    refreshTable(t.dataset.id);
+    return;
+  }
+  if (t.id === "setRpm"){
+    const v = num(t.value);
+    Store.settings.rpm = v;
+    Store.saveSettings();
+    renderChips();
+    // full re-render: every dollar figure and the default sort depend on RPM
+    DIM_CACHE = null;
+    clearTimeout(window.__rpmT);
+    window.__rpmT = setTimeout(() => { render(); showTab("settings"); $("#setRpm").focus(); }, 450);
+    return;
+  }
+});
+
+document.addEventListener("change", e => {
+  const t = e.target, act = t.dataset ? t.dataset.act : null;
+
+  if (act === "stage-date"){
+    const s = STAGE.find(x => x.id === t.dataset.id);
+    if (s){ s.iso = t.value; renderStage(); }
+    return;
+  }
+  if (act === "stage-type"){
+    const s = STAGE.find(x => x.id === t.dataset.id);
+    if (s){ s.issueType = t.value; renderStage(); }
+    return;
+  }
+  if (act === "stage-action"){
+    const s = STAGE.find(x => x.id === t.dataset.id);
+    if (s){ s.action = t.value; }
+    return;
+  }
+  if (act === "owner"){
+    const cid = t.dataset.cid, v = t.value.trim();
+    if (v) Store.owners[cid] = v; else delete Store.owners[cid];
+    if (Store.saveOwners()){
+      DIM_CACHE = null;
+      render(); showTab("settings");
+      toast(v ? "Mapped " + esc(cid) + " → " + esc(v) : "Mapping removed for " + esc(cid), "ok", 2500);
+    }
+    return;
+  }
+  if (t.id === "setAnn"){
+    Store.settings.annualizeOverlap = t.checked;
+    Store.saveSettings();
+    DIM_CACHE = null;
+    render(); showTab("settings");
+    return;
+  }
+  if (t.id === "jsonInput"){
+    const f = t.files && t.files[0];
+    t.value = "";
+    if (!f) return;
+    readFile(f).then(txt => {
+      let data;
+      try { data = JSON.parse(txt); }
+      catch(err){ toast("That file is not valid JSON.", "err"); return; }
+      if (!data || typeof data !== "object" || !data.snapshots || typeof data.snapshots !== "object"){
+        toast("Not a ledger backup — expected a <code>snapshots</code> object.", "err");
+        return;
+      }
+      const incoming = Object.keys(data.snapshots).length;
+      const clash = Object.keys(data.snapshots).filter(k => Store.snaps[k]).length;
+      if (!confirm("Import " + incoming + " snapshot(s) from this backup?\n\n" +
+                   clash + " of them already exist here and will be REPLACED.\n" +
+                   "Settings and owner mappings in the file will also be applied.")) return;
+
+      const prev = JSON.parse(JSON.stringify(Store.snaps));
+      let ok = 0;
+      Object.keys(data.snapshots).forEach(k => {
+        const s = data.snapshots[k];
+        if (!s || !Array.isArray(s.rows)) return;
+        Store.snaps[k] = {
+          date: s.date || (k.split("|")[0] || isoToday()),
+          issueType: s.issueType || (k.split("|")[1] || "(unknown)"),
+          files: Array.isArray(s.files) ? s.files : [],
+          importedAt: s.importedAt || new Date().toISOString(),
+          cols: Array.isArray(s.cols) ? s.cols : COLS,
+          rows: s.rows
+        };
+        ok++;
+      });
+      if (!Store.saveSnaps(prev)){ render(); return; }
+      if (data.settings) { Store.settings = Object.assign({}, DEFAULT_SETTINGS, data.settings); Store.saveSettings(); }
+      if (data.owners && typeof data.owners === "object"){ Store.owners = Object.assign({}, Store.owners, data.owners); Store.saveOwners(); }
+      DIM_CACHE = null;
+      render();
+      toast("Restored <b>" + ok + "</b> snapshot(s) from backup.", "ok");
+    }, err => toast("Could not read that file.", "err"));
+    return;
+  }
+});
+
+/* ---- go ---- */
+Store.load();
+render();
+if (!LSTORE.available){
+  toast("<b>localStorage is unavailable here — nothing will persist.</b><br>" +
+        esc(LSTORE.reason) + "<br>The ledger still works in memory for this tab. " +
+        "Open the page over http(s) (e.g. GitHub Pages) rather than a <code>file://</code> or <code>data:</code> URL.",
+        "err", 60000);
+}
+if (!Object.keys(Store.snaps).length){
+  toast("Empty ledger. Drop this week's <code>LE_ref_export_M-D.csv</code> and <code>LE_dispute_export_M-D.csv</code> to begin — the value compounds as weeks accumulate.", "", 9000);
+}
+</script>
+</body>
+</html>
